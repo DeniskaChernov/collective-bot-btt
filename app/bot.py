@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 
 from aiogram import Bot, Dispatcher
+from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -16,7 +17,10 @@ logger = logging.getLogger(__name__)
 
 
 def create_bot(settings: Settings) -> Bot:
-    return Bot(token=settings.telegram_bot_token, parse_mode=ParseMode.HTML)
+    return Bot(
+        token=settings.telegram_bot_token,
+        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
+    )
 
 
 def create_dispatcher(sessionmaker: async_sessionmaker[AsyncSession]) -> Dispatcher:
