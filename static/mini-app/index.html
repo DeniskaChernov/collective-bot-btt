@@ -427,6 +427,7 @@
   <script>
     (function() {
       const API_BASE = '';
+      const IMG_BASE = typeof window !== 'undefined' && window.location && window.location.origin ? window.location.origin : '';
       const tg = window.Telegram && window.Telegram.WebApp;
       if (tg) { tg.ready(); tg.expand(); }
       const initData = tg ? tg.initData || '' : '';
@@ -543,7 +544,7 @@
           const imgSrc = !p.image_url
             ? ''
             : isOwnUpload
-              ? p.image_url
+              ? (IMG_BASE + p.image_url)
               : '/public/proxy-image?url=' + encodeURIComponent(p.image_url);
           const directUrl = p.image_url ? escapeAttr(p.image_url) : '';
           const imgTag = p.image_url
@@ -579,7 +580,7 @@
           const p = productById(i.product_id);
           const name = p ? p.name : 'Товар #' + i.product_id;
           const img = p && p.image_url
-            ? '<img src="' + (p.image_url.indexOf('/') === 0 ? p.image_url : '/public/proxy-image?url=' + encodeURIComponent(p.image_url)) + '" alt="" class="cart-item-img" data-fallback="' + escapeAttr(p.image_url) + '" onerror="if(this.dataset.fallback&&this.src.indexOf(\'/public/proxy\')>=0){this.onerror=null;this.src=this.dataset.fallback;}" />'
+            ? '<img src="' + (p.image_url.indexOf('/') === 0 ? (IMG_BASE + p.image_url) : '/public/proxy-image?url=' + encodeURIComponent(p.image_url)) + '" alt="" class="cart-item-img" data-fallback="' + escapeAttr(p.image_url) + '" onerror="if(this.dataset.fallback&&this.src.indexOf(\'/public/proxy\')>=0){this.onerror=null;this.src=this.dataset.fallback;}" />'
             : '<div class="cart-item-no-img">🪑</div>';
           return '<div class="cart-item" data-product-id="' + i.product_id + '">' +
             img +
@@ -606,7 +607,7 @@
           const p = productById(o.product_id);
           const name = p ? p.name : 'Товар #' + o.product_id;
           const img = p && p.image_url
-            ? '<img src="' + (p.image_url.indexOf('/') === 0 ? p.image_url : '/public/proxy-image?url=' + encodeURIComponent(p.image_url)) + '" alt="" class="order-card-img" data-fallback="' + escapeAttr(p.image_url) + '" onerror="if(this.dataset.fallback&&this.src.indexOf(\'/public/proxy\')>=0){this.onerror=null;this.src=this.dataset.fallback;}" />'
+            ? '<img src="' + (p.image_url.indexOf('/') === 0 ? (IMG_BASE + p.image_url) : '/public/proxy-image?url=' + encodeURIComponent(p.image_url)) + '" alt="" class="order-card-img" data-fallback="' + escapeAttr(p.image_url) + '" onerror="if(this.dataset.fallback&&this.src.indexOf(\'/public/proxy\')>=0){this.onerror=null;this.src=this.dataset.fallback;}" />'
             : '<div class="order-card-no-img">🪑</div>';
           return '<div class="order-card">' +
             img +
