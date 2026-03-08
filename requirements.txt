@@ -5,6 +5,7 @@ asyncpg
 aiogram
 apscheduler
 pydantic-settings
+python-dotenv
 python-json-logger
 python-jose[cryptography]
 bcrypt>=4.0

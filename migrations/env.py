@@ -1,6 +1,15 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# Загружаем .env из корня проекта (рядом с alembic.ini) или из текущей папки
+_root = Path(__file__).resolve().parent.parent
+load_dotenv(_root / ".env")
+load_dotenv(Path.cwd() / ".env")
+
 from logging.config import fileConfig
 
 from alembic import context
@@ -21,7 +30,10 @@ def _sync_url_from_env() -> str:
         "DATABASE_URL", ""
     )
     if not url:
-        raise RuntimeError("Missing database URL env (ALEMBIC_DATABASE_URL or DATABASE_URL)")
+        raise RuntimeError(
+            "Не задан URL базы. Скопируйте .env.example в .env и укажите DATABASE_URL "
+            "(например: postgresql+asyncpg://user:password@localhost:5432/collective)"
+        )
     return (
         url.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
         .replace("postgres://", "postgresql://")
