@@ -24,8 +24,8 @@ async def contact(message: Message, session: AsyncSession):
         first_name=tg_user.first_name,
         last_name=tg_user.last_name,
     )
-    async with session.begin():
-        await set_user_phone(session, user_id=user.id, phone=contact.phone_number)
+    await set_user_phone(session, user_id=user.id, phone=contact.phone_number)
+    await session.commit()
     await message.answer(
         "✅ Регистрация завершена\n\n"
         "Теперь откройте приложение — там каталог, корзина и оформление заказов.",
