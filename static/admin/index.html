@@ -58,6 +58,7 @@
           <option value="completed">Выполнен</option>
         </select>
         <button type="button" id="btn-refresh">Обновить</button>
+        <button type="button" id="btn-tab-products">Товары</button>
       </div>
       <div id="orders-error" class="error hidden"></div>
       <table>
@@ -73,6 +74,64 @@
           </tr>
         </thead>
         <tbody id="orders-tbody"></tbody>
+      </table>
+    </div>
+
+    <div id="products-panel" class="card hidden">
+      <h1>Товары</h1>
+      <div class="toolbar">
+        <button type="button" id="btn-tab-orders">← Заказы</button>
+        <button type="button" id="btn-add-product">+ Добавить товар</button>
+      </div>
+      <div id="product-form" class="card hidden" style="margin-top: 12px;">
+        <h2 id="product-form-title">Новый товар</h2>
+        <div class="form-row">
+          <label>Артикул нитки *</label>
+          <input type="text" id="p-article" required placeholder="Например: NT-001" />
+        </div>
+        <div class="form-row">
+          <label>Название *</label>
+          <input type="text" id="p-name" required placeholder="Название товара" />
+        </div>
+        <div class="form-row">
+          <label>Ширина нитки</label>
+          <input type="text" id="p-thread-width" placeholder="Например: 4 мм" />
+        </div>
+        <div class="form-row">
+          <label>Цвет</label>
+          <input type="text" id="p-color" placeholder="Например: белый" />
+        </div>
+        <div class="form-row">
+          <label>Ссылка на фото</label>
+          <input type="url" id="p-image-url" placeholder="https://..." />
+        </div>
+        <div class="form-row">
+          <label>Порог партии (кг)</label>
+          <input type="number" id="p-min-weight" value="100" min="5" />
+        </div>
+        <div class="form-row">
+          <label>Макс. кг на одного (5–25)</label>
+          <input type="number" id="p-max-weight" value="25" min="5" max="25" />
+        </div>
+        <div id="product-form-error" class="error hidden"></div>
+        <button type="button" id="btn-product-save">Сохранить</button>
+        <button type="button" class="secondary" id="btn-product-cancel">Отмена</button>
+      </div>
+      <div id="products-error" class="error hidden"></div>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Артикул</th>
+            <th>Название</th>
+            <th>Ширина</th>
+            <th>Цвет</th>
+            <th>Собрано/порог</th>
+            <th>Статус</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="products-tbody"></tbody>
       </table>
     </div>
   </div>
@@ -176,6 +235,131 @@
 
       document.getElementById('filter-status').addEventListener('change', loadOrders);
       document.getElementById('btn-refresh').addEventListener('click', loadOrders);
+
+      document.getElementById('btn-tab-products').addEventListener('click', function() {
+        hide(document.getElementById('orders-panel'));
+        show(document.getElementById('products-panel'));
+        loadProducts();
+      });
+      document.getElementById('btn-tab-orders').addEventListener('click', function() {
+        hide(document.getElementById('products-panel'));
+        show(document.getElementById('orders-panel'));
+      });
+
+      let editingProductId = null;
+      document.getElementById('btn-add-product').addEventListener('click', function() {
+        editingProductId = null;
+        document.getElementById('product-form-title').textContent = 'Новый товар';
+        document.getElementById('p-article').value = '';
+        document.getElementById('p-name').value = '';
+        document.getElementById('p-thread-width').value = '';
+        document.getElementById('p-color').value = '';
+        document.getElementById('p-image-url').value = '';
+        document.getElementById('p-min-weight').value = '100';
+        document.getElementById('p-max-weight').value = '25';
+        hide(document.getElementById('product-form-error'));
+        show(document.getElementById('product-form'));
+      });
+      document.getElementById('btn-product-cancel').addEventListener('click', function() {
+        hide(document.getElementById('product-form'));
+        editingProductId = null;
+      });
+
+      async function loadProducts() {
+        const errEl = document.getElementById('products-error');
+        errEl.textContent = '';
+        hide(errEl);
+        try {
+          const products = await api('/admin/products');
+          const tbody = document.getElementById('products-tbody');
+          const statusL = { open: 'Набираем заказы', waiting_24h: 'Ждём дозаказ', closed: 'Производство' };
+          tbody.innerHTML = products.map(function(p) {
+            var actions = '<button type="button" class="small" data-edit-id="' + p.id + '">Изменить</button>';
+            if (p.status === 'open' || p.status === 'waiting_24h') actions += ' <button type="button" class="small secondary" data-close-id="' + p.id + '">В производство</button>';
+            if (p.status === 'closed') actions += ' <button type="button" class="small" data-reopen-id="' + p.id + '">Открыть</button>';
+            return '<tr><td>' + p.id + '</td><td>' + (p.article || '') + '</td><td>' + (p.name || '') + '</td><td>' + (p.thread_width || '—') + '</td><td>' + (p.color || '—') + '</td><td>' + p.total_weight + '/' + p.min_weight + '</td><td>' + (statusL[p.status] || p.status) + '</td><td>' + actions + '</td></tr>';
+          }).join('');
+          tbody.querySelectorAll('[data-edit-id]').forEach(function(btn) {
+            btn.addEventListener('click', function() { editProduct(parseInt(btn.dataset.editId, 10), products); });
+          });
+          tbody.querySelectorAll('[data-close-id]').forEach(function(btn) {
+            btn.addEventListener('click', function() { closeProduct(parseInt(btn.dataset.closeId, 10)); });
+          });
+          tbody.querySelectorAll('[data-reopen-id]').forEach(function(btn) {
+            btn.addEventListener('click', function() { reopenProduct(parseInt(btn.dataset.reopenId, 10)); });
+          });
+        } catch (err) {
+          if (err.message.includes('403') || err.message.includes('Invalid')) {
+            token = null;
+            localStorage.removeItem('admin_token');
+            hide(document.getElementById('products-panel'));
+            show(document.getElementById('login-card'));
+          } else {
+            errEl.textContent = err.message;
+            show(errEl);
+          }
+        }
+      }
+
+      function editProduct(id, products) {
+        var p = products.find(function(x) { return x.id === id; });
+        if (!p) return;
+        editingProductId = id;
+        document.getElementById('product-form-title').textContent = 'Редактировать товар';
+        document.getElementById('p-article').value = p.article || '';
+        document.getElementById('p-name').value = p.name || '';
+        document.getElementById('p-thread-width').value = p.thread_width || '';
+        document.getElementById('p-color').value = p.color || '';
+        document.getElementById('p-image-url').value = p.image_url || '';
+        document.getElementById('p-min-weight').value = p.min_weight || 100;
+        document.getElementById('p-max-weight').value = p.max_weight_per_order || 25;
+        show(document.getElementById('product-form'));
+      }
+
+      async function closeProduct(id) {
+        try {
+          await api('/admin/products/' + id + '/close', { method: 'POST' });
+          loadProducts();
+        } catch (err) { alert(err.message); }
+      }
+      async function reopenProduct(id) {
+        try {
+          await api('/admin/products/' + id + '/reopen', { method: 'POST' });
+          loadProducts();
+        } catch (err) { alert(err.message); }
+      }
+
+      document.getElementById('btn-product-save').addEventListener('click', async function() {
+        const errEl = document.getElementById('product-form-error');
+        errEl.textContent = '';
+        hide(errEl);
+        var maxKg = parseInt(document.getElementById('p-max-weight').value, 10);
+        if (isNaN(maxKg) || maxKg < 5) maxKg = 5;
+        if (maxKg > 25) maxKg = 25;
+        const payload = {
+          article: document.getElementById('p-article').value.trim(),
+          name: document.getElementById('p-name').value.trim(),
+          thread_width: document.getElementById('p-thread-width').value.trim() || null,
+          color: document.getElementById('p-color').value.trim() || null,
+          image_url: document.getElementById('p-image-url').value.trim() || null,
+          min_weight: parseInt(document.getElementById('p-min-weight').value, 10) || 100,
+          max_weight_per_order: maxKg
+        };
+        if (!payload.article || !payload.name) { errEl.textContent = 'Заполните артикул и название'; show(errEl); return; }
+        try {
+          if (editingProductId) {
+            await api('/admin/products/' + editingProductId, { method: 'PATCH', body: JSON.stringify(payload) });
+          } else {
+            await api('/admin/products', { method: 'POST', body: JSON.stringify({ profile: '', article: payload.article, name: payload.name, thread_width: payload.thread_width, color: payload.color, image_url: payload.image_url, min_weight: payload.min_weight, max_weight_per_order: payload.max_weight_per_order }) });
+          }
+          hide(document.getElementById('product-form'));
+          editingProductId = null;
+          loadProducts();
+        } catch (err) {
+          errEl.textContent = err.message;
+          show(errEl);
+        }
+      });
 
       if (token) {
         hide(document.getElementById('login-card'));

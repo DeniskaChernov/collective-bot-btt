@@ -458,7 +458,7 @@
       }
 
       function statusLabel(s) {
-        const t = { open: 'Открыт', waiting_24h: 'Добор 24ч', closed: 'Закрыт' };
+        const t = { open: 'Набираем заказы', waiting_24h: 'Ждём дозаказ', closed: 'Производство' };
         return t[s] || s;
       }
 
@@ -480,8 +480,8 @@
           return '<div class="product-card" data-product-id="' + p.id + '">' + img +
             '<div class="product-info">' +
               '<div class="name">' + escapeHtml(p.name) + '</div>' +
-              '<div class="meta">' + escapeHtml(p.article) + ' · ' + escapeHtml(p.profile) + '</div>' +
-              '<div class="weight"><span class="badge ' + statusClass(p.status) + '">' + statusLabel(p.status) + '</span> Мин. ' + p.min_weight + ' кг · Собрано ' + p.total_weight + ' кг</div>' +
+              '<div class="meta">' + escapeHtml(p.article) + (p.thread_width ? ' · ' + escapeHtml(p.thread_width) : '') + (p.color ? ' · ' + escapeHtml(p.color) : '') + (p.profile && !p.thread_width && !p.color ? ' · ' + escapeHtml(p.profile) : '') + '</div>' +
+              '<div class="weight"><span class="badge ' + statusClass(p.status) + '">' + statusLabel(p.status) + '</span> Мин. ' + p.min_weight + ' кг · Собрано ' + p.total_weight + ' кг · заказ от 5 до ' + (p.max_weight_per_order || 25) + ' кг</div>' +
               '<div class="product-actions">' +
                 '<button type="button" data-action="remove5" data-id="' + p.id + '"' + (weight < 5 || closed ? ' disabled' : '') + ' class="danger">−</button>' +
                 '<span class="qty">' + weight + ' кг</span>' +

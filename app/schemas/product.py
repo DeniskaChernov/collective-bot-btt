@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, HttpUrl, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from app.models import ProductStatus
 
@@ -22,10 +22,14 @@ class ProductOut(BaseModel):
     name: str
     profile: str
     image_url: str | None
+    thread_width: str | None
+    color: str | None
     min_weight: int
+    max_weight_per_order: int
     total_weight: int
     status: ProductStatus
     threshold_reached_at: datetime | None
+    collection_until: datetime | None
 
     @field_validator("image_url", mode="before")
     @classmethod
@@ -36,15 +40,21 @@ class ProductOut(BaseModel):
 class ProductCreateIn(BaseModel):
     article: str
     name: str
-    profile: str
-    image_url: HttpUrl | None = None
+    profile: str = ""
+    image_url: str | None = None
+    thread_width: str | None = None
+    color: str | None = None
     min_weight: int = 100
+    max_weight_per_order: int = 25
 
 
 class ProductUpdateIn(BaseModel):
     article: str | None = None
     name: str | None = None
     profile: str | None = None
-    image_url: HttpUrl | None = None
+    image_url: str | None = None
+    thread_width: str | None = None
+    color: str | None = None
     min_weight: int | None = None
+    max_weight_per_order: int | None = None
 

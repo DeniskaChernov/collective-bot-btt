@@ -11,7 +11,7 @@ from app.errors import NotFound, ValidationError
 from app.models import Order, Product, ProductStatus, User
 from app.notifications import send_admin_notification, send_user_notification
 from app.services.cart import clear_cart_item, get_cart_item_for_update
-from app.services.scheduler import schedule_close_product
+from app.services.scheduler import schedule_close_product, cancel_collection_end_product
 from app.services.users import get_user
 
 logger = logging.getLogger(__name__)
@@ -117,6 +117,7 @@ async def create_order_from_cart(
 
     if scheduler is not None and should_schedule_product_id is not None and schedule_at is not None:
         schedule_close_product(scheduler, product_id=int(should_schedule_product_id), run_at=schedule_at)
+        cancel_collection_end_product(scheduler, product_id=int(should_schedule_product_id))
         logger.info(
             "scheduler.job_scheduled",
             extra={"job_id": f"close_product:{should_schedule_product_id}", "product_id": should_schedule_product_id},

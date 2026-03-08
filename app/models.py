@@ -57,13 +57,19 @@ class Product(Base):
     profile: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    thread_width: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    color: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
     min_weight: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
+    max_weight_per_order: Mapped[int] = mapped_column(Integer, nullable=False, default=25)
     total_weight: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     status: Mapped[ProductStatus] = mapped_column(
         Enum(ProductStatus, name="product_status"), nullable=False, default=ProductStatus.open
     )
     threshold_reached_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    """Когда набрали min_weight — с этого момента 24ч до закрытия."""
+    collection_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    """Конец окна набора заказов (3 дня). Если к этому времени < min_weight — партия закрывается."""
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
@@ -76,8 +82,11 @@ class Product(Base):
     __table_args__ = (
         CheckConstraint("min_weight > 0", name="ck_products_min_weight_positive"),
         CheckConstraint("total_weight >= 0", name="ck_products_total_weight_nonneg"),
+        CheckConstraint("max_weight_per_order >= 5", name="ck_products_max_weight_per_order_min"),
+        CheckConstraint("max_weight_per_order <= 500", name="ck_products_max_weight_per_order_max"),
         Index("ix_products_status", "status"),
         Index("ix_products_threshold_reached_at", "threshold_reached_at"),
+        Index("ix_products_collection_until", "collection_until"),
     )
 
 

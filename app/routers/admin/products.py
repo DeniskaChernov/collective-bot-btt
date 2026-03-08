@@ -19,7 +19,7 @@ from app.services.products import (
     manual_reopen_product,
     update_product,
 )
-from app.services.scheduler import cancel_close_product
+from app.services.scheduler import cancel_close_product, cancel_collection_end_product, schedule_collection_end_product
 
 logger = logging.getLogger(__name__)
 
@@ -41,15 +41,24 @@ async def admin_list_products(session: AsyncSession = Depends(get_db)):
 
 
 @router.post("")
-async def admin_create_product(payload: ProductCreateIn, session: AsyncSession = Depends(get_db)):
+async def admin_create_product(payload: ProductCreateIn, request: Request, session: AsyncSession = Depends(get_db)):
     product = await create_product(
         session,
         article=payload.article,
         name=payload.name,
         profile=payload.profile,
-        image_url=str(payload.image_url) if payload.image_url else None,
+        image_url=payload.image_url.strip() if payload.image_url else None,
+        thread_width=payload.thread_width.strip() if payload.thread_width else None,
+        color=payload.color.strip() if payload.color else None,
         min_weight=payload.min_weight,
+        max_weight_per_order=payload.max_weight_per_order,
     )
+    if product.collection_until:
+        schedule_collection_end_product(
+            _scheduler(request),
+            product_id=product.id,
+            run_at=product.collection_until,
+        )
     return ok(ProductOut.model_validate(product))
 
 
@@ -67,8 +76,11 @@ async def admin_update_product(payload: ProductUpdateIn, product_id: int, sessio
         article=payload.article,
         name=payload.name,
         profile=payload.profile,
-        image_url=str(payload.image_url) if payload.image_url else None,
+        image_url=payload.image_url,
+        thread_width=payload.thread_width.strip() if payload.thread_width else None,
+        color=payload.color.strip() if payload.color else None,
         min_weight=payload.min_weight,
+        max_weight_per_order=payload.max_weight_per_order,
     )
     return ok(ProductOut.model_validate(product))
 
@@ -76,7 +88,9 @@ async def admin_update_product(payload: ProductUpdateIn, product_id: int, sessio
 @router.post("/{product_id}/close")
 async def admin_manual_close(product_id: int, request: Request, session: AsyncSession = Depends(get_db)):
     product = await manual_close_product(session, product_id=product_id)
-    cancel_close_product(_scheduler(request), product_id=product_id)
+    sched = _scheduler(request)
+    cancel_close_product(sched, product_id=product_id)
+    cancel_collection_end_product(sched, product_id=product_id)
     logger.info(
         "scheduler.job_cancelled",
         extra={"job_id": f"close_product:{product_id}", "product_id": product_id},
@@ -87,10 +101,9 @@ async def admin_manual_close(product_id: int, request: Request, session: AsyncSe
 @router.post("/{product_id}/reopen")
 async def admin_manual_reopen(product_id: int, request: Request, session: AsyncSession = Depends(get_db)):
     product = await manual_reopen_product(session, product_id=product_id)
-    cancel_close_product(_scheduler(request), product_id=product_id)
-    logger.info(
-        "scheduler.job_cancelled",
-        extra={"job_id": f"close_product:{product_id}", "product_id": product_id},
-    )
+    sched = _scheduler(request)
+    cancel_close_product(sched, product_id=product_id)
+    if product.collection_until:
+        schedule_collection_end_product(sched, product_id=product_id, run_at=product.collection_until)
     return ok(ProductOut.model_validate(product))
 

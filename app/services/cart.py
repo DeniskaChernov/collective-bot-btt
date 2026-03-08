@@ -32,6 +32,12 @@ async def add_to_cart_5kg(session: AsyncSession, *, user_id: int, product_id: in
             await session.flush()
 
         item.weight += STEP_KG
+        if product.max_weight_per_order is not None and item.weight > product.max_weight_per_order:
+            item.weight -= STEP_KG
+            await session.flush()
+            raise ValidationError(
+                f"Максимум {product.max_weight_per_order} кг на один заказ по этому товару"
+            )
         await session.flush()
         logger.info("cart.add_5", extra={"user_id": user_id, "product_id": product_id, "weight": item.weight})
         return item

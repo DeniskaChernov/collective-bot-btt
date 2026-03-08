@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import Settings, get_settings
 from app.database import create_engine, create_sessionmaker
 from app.models import Order, Product, ProductStatus, User
-from app.services.scheduler import schedule_close_product
+from app.services.scheduler import schedule_close_product, schedule_collection_end_product
 from app.notifications import send_admin_notification, send_user_notification
 
 logger = logging.getLogger(__name__)
@@ -38,6 +38,17 @@ async def recover_scheduler_jobs(*, session: AsyncSession, scheduler: AsyncIOSch
         if run_at < now:
             run_at = now + timedelta(seconds=1)
         schedule_close_product(scheduler, product_id=int(product_id), run_at=run_at)
+
+    # Восстановить задачи «конец 3-дневного окна» для открытых партий
+    stmt2 = (
+        select(Product.id, Product.collection_until)
+        .where(Product.status == ProductStatus.open)
+        .where(Product.collection_until.is_not(None))
+        .where(Product.collection_until > now)
+    )
+    for product_id, until in (await session.execute(stmt2)).all():
+        if until:
+            schedule_collection_end_product(scheduler, product_id=int(product_id), run_at=until)
 
 
 async def close_product_job(*, product_id: int) -> None:
@@ -94,4 +105,46 @@ async def _close_product_if_due(*, session: AsyncSession, product_id: int) -> No
                 )
 
     await send_admin_notification(f"🚀 Партия #{product_id} закрыта (таймер 24ч истёк)")
+
+
+async def collection_end_job(*, product_id: int) -> None:
+    """
+    Конец 3-дневного окна набора заказов.
+    Если партия ещё open и не набрала min_weight — закрываем.
+    """
+    settings = get_settings()
+    engine = create_engine(settings)
+    sessionmaker = create_sessionmaker(engine)
+    async with sessionmaker() as session:
+        await _collection_end_if_due(session=session, product_id=product_id)
+    await engine.dispose()
+
+
+async def _collection_end_if_due(*, session: AsyncSession, product_id: int) -> None:
+    total_weight = min_weight = 0
+    async with session.begin():
+        product = (
+            await session.execute(
+                select(Product).where(Product.id == product_id).with_for_update()
+            )
+        ).scalar_one_or_none()
+        if product is None:
+            logger.warning("scheduler.collection_end_product_not_found", extra={"product_id": product_id})
+            return
+        if product.status != ProductStatus.open:
+            return
+        if product.collection_until is None:
+            return
+        if product.total_weight >= product.min_weight:
+            return
+        total_weight = product.total_weight
+        min_weight = product.min_weight
+        product.status = ProductStatus.closed
+        logger.info(
+            "product.closed",
+            extra={"product_id": product_id, "source": "scheduler", "reason": "collection_window_ended"},
+        )
+    await send_admin_notification(
+        f"⏱ Партия #{product_id} закрыта: 3 дня истекли, набрано {total_weight} кг (порог {min_weight} кг)."
+    )
 

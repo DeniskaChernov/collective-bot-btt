@@ -5,6 +5,7 @@ import logging
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from aiogram.types import MenuButtonWebApp, WebAppInfo
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.bot_handlers.catalog import router as catalog_router
@@ -46,4 +47,14 @@ async def ensure_webhook(bot: Bot, settings: Settings) -> None:
         drop_pending_updates=False,
     )
     logger.info("telegram.webhook_set", extra={"url": url})
+
+    # Кнопка меню бота (рядом с полем ввода) — всегда открывает наш Mini App
+    mini_app_url = settings.webhook_base_url.rstrip("/") + "/mini-app/"
+    try:
+        await bot.set_chat_menu_button(
+            menu_button=MenuButtonWebApp(text="Открыть приложение", web_app=WebAppInfo(url=mini_app_url))
+        )
+        logger.info("telegram.menu_button_set", extra={"url": mini_app_url})
+    except Exception as e:
+        logger.warning("telegram.menu_button_failed", extra={"error": str(e)})
 
