@@ -26,7 +26,13 @@ async def login(payload: AdminLoginIn, request: Request):
             content=err("invalid_credentials", "Invalid credentials").model_dump(),
         )
 
-    if not verify_password(payload.password, settings.admin_password_hash):
+    try:
+        if not verify_password(payload.password, settings.admin_password_hash):
+            return JSONResponse(
+                status_code=401,
+                content=err("invalid_credentials", "Invalid credentials").model_dump(),
+            )
+    except Exception:
         return JSONResponse(
             status_code=401,
             content=err("invalid_credentials", "Invalid credentials").model_dump(),
