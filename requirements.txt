@@ -7,6 +7,7 @@ apscheduler
 pydantic-settings
 python-json-logger
 python-jose[cryptography]
+bcrypt>=4.0
 passlib[bcrypt]
 alembic
 psycopg2-binary

@@ -11,9 +11,9 @@ import getpass
 import sys
 
 try:
-    from passlib.hash import bcrypt
+    import bcrypt
 except ImportError:
-    print("Установи passlib: pip install passlib[bcrypt]", file=sys.stderr)
+    print("Установи bcrypt: pip install bcrypt", file=sys.stderr)
     sys.exit(1)
 
 def main() -> None:
@@ -21,10 +21,11 @@ def main() -> None:
     if not password:
         print("Пароль не задан.", file=sys.stderr)
         sys.exit(1)
-    if len(password.encode("utf-8")) > 72:
+    pw_bytes = password.encode("utf-8")
+    if len(pw_bytes) > 72:
         print("Пароль не длиннее 72 байт (bcrypt).", file=sys.stderr)
         sys.exit(1)
-    h = bcrypt.hash(password)
+    h = bcrypt.hashpw(pw_bytes, bcrypt.gensalt()).decode("utf-8")
     print()
     print("Скопируй строку ниже в ADMIN_PASSWORD_HASH в Railway:")
     print()
