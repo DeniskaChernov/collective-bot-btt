@@ -21,6 +21,16 @@ class OrderOut(BaseModel):
     created_at: datetime
 
 
+class AdminOrderOut(OrderOut):
+    """Заказ с контактами заказчика для админки (связь, предоплата)."""
+
+    user_phone: str | None = None
+    user_telegram_id: int | None = None
+    user_username: str | None = None
+    user_first_name: str | None = None
+    telegram_link: str | None = None
+
+
 class OrderCreateIn(BaseModel):
     fulfillment_type: Order.FulfillmentType
     delivery_address: str | None = Field(None, max_length=500)

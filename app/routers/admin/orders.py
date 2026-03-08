@@ -3,11 +3,12 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import and_, desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.models import Order
 from app.notifications import send_user_notification
-from app.schemas.order import OrderOut, OrderStatusUpdateIn
+from app.schemas.order import AdminOrderOut, OrderOut, OrderStatusUpdateIn
 from app.schemas.response import ok
 from app.security.admin import require_admin
 from app.security.rate_limit import admin_rate_limit
@@ -19,6 +20,31 @@ router = APIRouter(
 )
 
 
+def _order_to_admin_out(order: Order) -> AdminOrderOut:
+    user = order.user
+    telegram_id = user.telegram_id if user else None
+    username = user.username if user else None
+    telegram_link = None
+    if telegram_id:
+        telegram_link = f"https://t.me/{username}" if username else f"tg://user?id={telegram_id}"
+    return AdminOrderOut(
+        id=order.id,
+        user_id=order.user_id,
+        product_id=order.product_id,
+        weight_total=order.weight_total,
+        status=order.status,
+        fulfillment_type=order.fulfillment_type,
+        delivery_address=order.delivery_address,
+        comment=order.comment,
+        created_at=order.created_at,
+        user_phone=user.phone if user else None,
+        user_telegram_id=int(telegram_id) if telegram_id else None,
+        user_username=username,
+        user_first_name=user.first_name if user else None,
+        telegram_link=telegram_link,
+    )
+
+
 @router.get("")
 async def list_orders(
     limit: int = Query(default=50, ge=1, le=200),
@@ -27,7 +53,7 @@ async def list_orders(
     fulfillment_type: Order.FulfillmentType | None = Query(default=None),
     session: AsyncSession = Depends(get_db),
 ):
-    stmt = select(Order)
+    stmt = select(Order).options(selectinload(Order.user))
     conditions = []
     if status is not None:
         conditions.append(Order.status == status)
@@ -37,17 +63,17 @@ async def list_orders(
         stmt = stmt.where(and_(*conditions))
     stmt = stmt.order_by(desc(Order.created_at)).limit(limit).offset(offset)
     orders = list((await session.execute(stmt)).scalars().all())
-    return ok([OrderOut.model_validate(o) for o in orders])
+    return ok([_order_to_admin_out(o) for o in orders])
 
 
 @router.get("/{order_id}")
 async def get_order(order_id: int, session: AsyncSession = Depends(get_db)):
-    order = await session.get(Order, order_id)
+    order = await session.get(Order, order_id, options=[selectinload(Order.user)])
     if order is None:
         from app.errors import NotFound
 
         raise NotFound("Order not found", details={"order_id": order_id})
-    return ok(OrderOut.model_validate(order))
+    return ok(_order_to_admin_out(order))
 
 
 @router.patch("/{order_id}/status")
@@ -56,8 +82,6 @@ async def update_order_status(
     payload: OrderStatusUpdateIn,
     session: AsyncSession = Depends(get_db),
 ):
-    from sqlalchemy.orm import selectinload
-
     from app.errors import NotFound
 
     async with session.begin():
@@ -80,15 +104,12 @@ async def update_order_status(
             telegram_id,
             f"📦 Заказ #{order_id}: статус изменён на «{status_text}».",
         )
-    async with session.begin():
-        order = await session.get(Order, order_id)
-    return ok(OrderOut.model_validate(order))
+    order = await session.get(Order, order_id, options=[selectinload(Order.user)])
+    return ok(_order_to_admin_out(order))
 
 
 @router.post("/{order_id}/cancel")
 async def cancel_order(order_id: int, session: AsyncSession = Depends(get_db)):
-    from sqlalchemy.orm import selectinload
-
     from app.errors import NotFound
 
     async with session.begin():
@@ -105,7 +126,6 @@ async def cancel_order(order_id: int, session: AsyncSession = Depends(get_db)):
             telegram_id,
             f"❌ Заказ #{order_id} отменён.",
         )
-    async with session.begin():
-        order = await session.get(Order, order_id)
-    return ok(OrderOut.model_validate(order))
+    order = await session.get(Order, order_id, options=[selectinload(Order.user)])
+    return ok(_order_to_admin_out(order))
 

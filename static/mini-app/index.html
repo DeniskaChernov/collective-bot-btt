@@ -138,6 +138,26 @@
       border-radius: 10px;
       background: var(--border);
     }
+    .product-card .img-wrap {
+      width: 76px;
+      height: 76px;
+      flex-shrink: 0;
+      position: relative;
+    }
+    .product-card .img-wrap .no-img {
+      position: absolute;
+      inset: 0;
+      width: 76px;
+      height: 76px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 24px;
+    }
+    .product-card .img-wrap .no-img.hidden { display: none; }
     .product-card .no-img {
       width: 76px;
       height: 76px;
@@ -203,6 +223,27 @@
       gap: 12px;
       box-shadow: var(--shadow);
     }
+    .cart-item .cart-item-img {
+      width: 56px;
+      height: 56px;
+      flex-shrink: 0;
+      border-radius: 10px;
+      object-fit: cover;
+      background: var(--border);
+    }
+    .cart-item .cart-item-no-img {
+      width: 56px;
+      height: 56px;
+      flex-shrink: 0;
+      background: var(--accent-soft);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent);
+      font-size: 20px;
+    }
+    .cart-item .cart-item-body { flex: 1; min-width: 0; }
     .cart-item .name { font-weight: 600; font-size: 15px; }
     .cart-item .weight { color: var(--text-muted); font-size: 14px; margin-top: 2px; }
     .cart-item button {
@@ -298,7 +339,31 @@
       padding: var(--pad);
       margin-bottom: 12px;
       box-shadow: var(--shadow);
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
     }
+    .order-card .order-card-img {
+      width: 56px;
+      height: 56px;
+      flex-shrink: 0;
+      border-radius: 10px;
+      object-fit: cover;
+      background: var(--border);
+    }
+    .order-card .order-card-no-img {
+      width: 56px;
+      height: 56px;
+      flex-shrink: 0;
+      background: var(--accent-soft);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent);
+      font-size: 20px;
+    }
+    .order-card .order-card-body { flex: 1; min-width: 0; }
     .order-card .row { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 14px; }
     .order-card .row:last-child { margin-bottom: 0; }
     .order-card .status { font-weight: 600; }
@@ -481,9 +546,10 @@
               ? p.image_url
               : '/public/proxy-image?url=' + encodeURIComponent(p.image_url);
           const directUrl = p.image_url ? escapeAttr(p.image_url) : '';
-          const img = p.image_url
-            ? '<img src="' + imgSrc + '" data-fallback="' + directUrl + '" alt="" loading="lazy" onerror="if(this.dataset.fallback&&this.src.indexOf(\'/public/proxy\')>=0){this.onerror=null;this.src=this.dataset.fallback;}" />'
+          const imgTag = p.image_url
+            ? '<span class="img-wrap"><img src="' + imgSrc + '" data-fallback="' + directUrl + '" data-own="' + (isOwnUpload ? '1' : '') + '" alt="" loading="lazy" onerror="var i=this,n=i.nextElementSibling;i.style.display=\'none\';if(n)n.classList.remove(\'hidden\');else if(i.dataset.fallback&&i.src.indexOf(\'/public/proxy\')>=0){i.onerror=null;i.src=i.dataset.fallback;}" /><span class="no-img hidden">🪑</span></span>'
             : '<div class="no-img">🪑</div>';
+          const img = p.image_url ? imgTag : '<div class="no-img">🪑</div>';
           return '<div class="product-card" data-product-id="' + p.id + '">' + img +
             '<div class="product-info">' +
               '<div class="name">' + escapeHtml(p.name) + '</div>' +
@@ -512,8 +578,12 @@
         el.innerHTML = cart.items.map(i => {
           const p = productById(i.product_id);
           const name = p ? p.name : 'Товар #' + i.product_id;
+          const img = p && p.image_url
+            ? '<img src="' + (p.image_url.indexOf('/') === 0 ? p.image_url : '/public/proxy-image?url=' + encodeURIComponent(p.image_url)) + '" alt="" class="cart-item-img" data-fallback="' + escapeAttr(p.image_url) + '" onerror="if(this.dataset.fallback&&this.src.indexOf(\'/public/proxy\')>=0){this.onerror=null;this.src=this.dataset.fallback;}" />'
+            : '<div class="cart-item-no-img">🪑</div>';
           return '<div class="cart-item" data-product-id="' + i.product_id + '">' +
-            '<div><div class="name">' + escapeHtml(name) + '</div><div class="weight">' + i.weight + ' кг</div></div>' +
+            img +
+            '<div class="cart-item-body"><div class="name">' + escapeHtml(name) + '</div><div class="weight">' + i.weight + ' кг</div></div>' +
             '<button type="button" data-order-product-id="' + i.product_id + '" data-order-weight="' + i.weight + '">Оформить заказ</button></div>';
         }).join('');
         el.querySelectorAll('[data-order-product-id]').forEach(btn => {
@@ -535,10 +605,15 @@
         el.innerHTML = orders.map(o => {
           const p = productById(o.product_id);
           const name = p ? p.name : 'Товар #' + o.product_id;
+          const img = p && p.image_url
+            ? '<img src="' + (p.image_url.indexOf('/') === 0 ? p.image_url : '/public/proxy-image?url=' + encodeURIComponent(p.image_url)) + '" alt="" class="order-card-img" data-fallback="' + escapeAttr(p.image_url) + '" onerror="if(this.dataset.fallback&&this.src.indexOf(\'/public/proxy\')>=0){this.onerror=null;this.src=this.dataset.fallback;}" />'
+            : '<div class="order-card-no-img">🪑</div>';
           return '<div class="order-card">' +
+            img +
+            '<div class="order-card-body">' +
             '<div class="row"><span>' + escapeHtml(name) + '</span><span>' + o.weight_total + ' кг</span></div>' +
             '<div class="row"><span class="status ' + o.status + '">' + orderStatusLabel(o.status) + '</span><span>' + new Date(o.created_at).toLocaleDateString('ru') + '</span></div>' +
-            '</div>';
+            '</div></div>';
         }).join('');
       }
 

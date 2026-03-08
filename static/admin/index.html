@@ -30,6 +30,9 @@
     .upload-status { font-size: 13px; color: #666; }
     .upload-status.ok { color: #2e7d32; }
     .upload-status.err { color: #c00; }
+    .collective-card { background: #f0f7ff; border: 1px solid #b3d9ff; }
+    .collective-card h2 { margin: 0 0 10px 0; font-size: 1.1rem; }
+    .collective-card .kg { font-size: 1.25rem; font-weight: 700; color: #c45c26; }
   </style>
 </head>
 <body>
@@ -52,6 +55,12 @@
 
     <div id="orders-panel" class="card hidden">
       <h1>Заказы</h1>
+      <div id="collective-order-card" class="card collective-card" style="margin-bottom: 20px;">
+        <h2>Общий заказ (текущая партия)</h2>
+        <div id="collective-order-body">Загрузка…</div>
+        <div style="margin-top: 10px;"><button type="button" id="btn-edit-collective" class="small">Редактировать партию</button></div>
+      </div>
+      <h2 style="font-size: 1rem; margin-bottom: 10px;">Заказы покупателей</h2>
       <div class="toolbar">
         <select id="filter-status">
           <option value="">Все статусы</option>
@@ -64,13 +73,14 @@
         <button type="button" id="btn-tab-products">Товары</button>
       </div>
       <div id="orders-error" class="error hidden"></div>
+      <p style="font-size: 13px; color: #666; margin-bottom: 12px;">Заказы со статусом «Ожидает» — свяжитесь с заказчиком (телефон / Telegram), возьмите предоплату и нажмите «Подтвердить».</p>
       <table>
         <thead>
           <tr>
             <th>ID</th>
-            <th>Пользователь</th>
-            <th>Товар</th>
+            <th>Заказчик / контакты</th>
             <th>Вес</th>
+            <th>Получение</th>
             <th>Статус</th>
             <th>Дата</th>
             <th></th>
@@ -167,6 +177,15 @@
 
       function show(el) { el.classList.remove('hidden'); }
       function hide(el) { el.classList.add('hidden'); }
+      function escapeHtml(s) {
+        if (s == null) return '';
+        var div = document.createElement('div');
+        div.textContent = s;
+        return div.innerHTML;
+      }
+      function escapeAttr(s) {
+        return escapeHtml(s).replace(/"/g, '&quot;');
+      }
 
       document.getElementById('login-form').addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -186,6 +205,7 @@
           hide(document.getElementById('login-card'));
           show(document.getElementById('orders-panel'));
           loadOrders();
+          loadCollectiveOrder();
         } catch (err) {
           errEl.textContent = err.message;
           show(errEl);
@@ -195,6 +215,7 @@
       function renderOrders(orders) {
         const tbody = document.getElementById('orders-tbody');
         const statusLabels = { pending: 'Ожидает', confirmed: 'Подтверждён', cancelled: 'Отменён', completed: 'Выполнен' };
+        const fulfillmentLabels = { pickup: 'Самовывоз', delivery: 'Доставка', uzum_market: 'Uzum Market' };
         tbody.innerHTML = orders.map(o => {
           const date = o.created_at ? new Date(o.created_at).toLocaleString('ru') : '';
           const canChange = o.status === 'pending' || o.status === 'confirmed';
@@ -202,7 +223,11 @@
           if (canChange && o.status !== 'confirmed') actions += '<button type="button" class="small" data-action="confirm" data-id="' + o.id + '">Подтвердить</button>';
           if (canChange && o.status !== 'cancelled') actions += '<button type="button" class="small secondary" data-action="cancel" data-id="' + o.id + '">Отменить</button>';
           if (canChange && o.status !== 'completed') actions += '<button type="button" class="small" data-action="complete" data-id="' + o.id + '">Выполнен</button>';
-          return '<tr><td>' + o.id + '</td><td>' + o.user_id + '</td><td>' + o.product_id + '</td><td>' + o.weight_total + ' кг</td><td><span class="badge ' + o.status + '">' + (statusLabels[o.status] || o.status) + '</span></td><td>' + date + '</td><td>' + actions + '</td></tr>';
+          const name = o.user_first_name || '—';
+          const phone = o.user_phone || '—';
+          const tgLink = o.telegram_link ? '<a href="' + escapeAttr(o.telegram_link) + '" target="_blank" rel="noopener" style="font-size:12px;">Написать в Telegram</a>' : '—';
+          const contact = '<div style="font-size:13px;"><strong>' + escapeHtml(name) + '</strong><br/>Тел: ' + escapeHtml(phone) + '<br/>' + tgLink + '</div>';
+          return '<tr><td>' + o.id + '</td><td>' + contact + '</td><td>' + o.weight_total + ' кг</td><td>' + (fulfillmentLabels[o.fulfillment_type] || o.fulfillment_type) + '</td><td><span class="badge ' + o.status + '">' + (statusLabels[o.status] || o.status) + '</span></td><td>' + date + '</td><td>' + actions + '</td></tr>';
         }).join('');
         tbody.querySelectorAll('[data-action]').forEach(btn => {
           btn.addEventListener('click', () => setStatus(parseInt(btn.dataset.id, 10), btn.dataset.action));
@@ -244,7 +269,10 @@
       }
 
       document.getElementById('filter-status').addEventListener('change', loadOrders);
-      document.getElementById('btn-refresh').addEventListener('click', loadOrders);
+      document.getElementById('btn-refresh').addEventListener('click', function() {
+        loadOrders();
+        loadCollectiveOrder();
+      });
 
       document.getElementById('btn-tab-products').addEventListener('click', function() {
         hide(document.getElementById('orders-panel'));
@@ -254,6 +282,40 @@
       document.getElementById('btn-tab-orders').addEventListener('click', function() {
         hide(document.getElementById('products-panel'));
         show(document.getElementById('orders-panel'));
+        loadOrders();
+        loadCollectiveOrder();
+      });
+
+      let collectiveProduct = null;
+      let allProducts = [];
+
+      async function loadCollectiveOrder() {
+        const el = document.getElementById('collective-order-body');
+        try {
+          const products = await api('/admin/products');
+          allProducts = products;
+          var p = products.find(function(x) { return x.status === 'open' || x.status === 'waiting_24h'; }) || products[0];
+          collectiveProduct = p || null;
+          if (!p) {
+            el.innerHTML = '<p style="color:#666;">Нет партии. Создайте товар во вкладке «Товары» — он станет общим заказом.</p>';
+            document.getElementById('btn-edit-collective').style.display = 'none';
+            return;
+          }
+          document.getElementById('btn-edit-collective').style.display = '';
+          var statusL = { open: 'Набираем заказы', waiting_24h: 'Ждём дозаказ', closed: 'Производство' };
+          el.innerHTML = '<p><strong>' + escapeHtml(p.name) + '</strong> (арт. ' + escapeHtml(p.article || '') + ')</p>' +
+            '<p class="kg">Собрано ' + p.total_weight + ' кг из ' + p.min_weight + ' кг</p>' +
+            '<p>Статус: ' + (statusL[p.status] || p.status) + '</p>';
+        } catch (err) {
+          el.innerHTML = '<span class="error">Не удалось загрузить</span>';
+        }
+      }
+
+      document.getElementById('btn-edit-collective').addEventListener('click', function() {
+        if (!collectiveProduct) return;
+        hide(document.getElementById('orders-panel'));
+        show(document.getElementById('products-panel'));
+        loadProducts().then(function() { editProduct(collectiveProduct.id, allProducts); });
       });
 
       let editingProductId = null;
@@ -323,6 +385,7 @@
         hide(errEl);
         try {
           const products = await api('/admin/products');
+          allProducts = products;
           const tbody = document.getElementById('products-tbody');
           const statusL = { open: 'Набираем заказы', waiting_24h: 'Ждём дозаказ', closed: 'Производство' };
           tbody.innerHTML = products.map(function(p) {
