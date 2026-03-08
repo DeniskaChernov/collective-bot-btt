@@ -45,6 +45,8 @@ async def lifespan(app: FastAPI):
     if os.environ.get("TESTING"):
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+
+    scheduler = create_scheduler(settings)
     app.state.scheduler = scheduler
     scheduler.start()
 
