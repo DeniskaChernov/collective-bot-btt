@@ -19,8 +19,8 @@ router = APIRouter(
     dependencies=[Depends(require_admin), Depends(admin_rate_limit)],
 )
 
-# Папка относительно корня проекта (рядом с app/)
-UPLOAD_DIR = Path(__file__).resolve().parent.parent.parent / "uploads"
+# Корень проекта (рядом с app/); в Docker = /app, чтобы совпадало с main.py и Volume /app/uploads
+UPLOAD_DIR = Path(__file__).resolve().parent.parent.parent.parent / "uploads"
 ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 MAX_SIZE = 5 * 1024 * 1024  # 5 MB
 EXT_MAP = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "image/gif": ".gif"}
