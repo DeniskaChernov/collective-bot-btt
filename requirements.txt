@@ -1,0 +1,17 @@
+fastapi
+uvicorn[standard]
+sqlalchemy[asyncio]
+asyncpg
+aiogram
+apscheduler
+pydantic-settings
+python-json-logger
+python-jose[cryptography]
+passlib[bcrypt]
+alembic
+psycopg2-binary
+pytest
+pytest-asyncio
+httpx
+aiosqlite
+

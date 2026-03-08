@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Админка — Bententrade</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+    .container { max-width: 900px; margin: 0 auto; }
+    h1 { margin-top: 0; }
+    .card { background: #fff; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    input, select, button { padding: 10px 14px; font-size: 14px; border-radius: 8px; border: 1px solid #ddd; }
+    button { background: #c45c26; color: #fff; border: none; cursor: pointer; }
+    button:hover { background: #a34a1b; }
+    button.secondary { background: #666; }
+    button.small { padding: 6px 10px; font-size: 12px; margin-left: 8px; }
+    .form-row { margin-bottom: 12px; }
+    .form-row label { display: block; margin-bottom: 4px; font-weight: 500; }
+    .error { color: #c00; margin-top: 8px; }
+    .hidden { display: none; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 10px; text-align: left; border-bottom: 1px solid #eee; }
+    th { background: #f9f9f9; font-weight: 600; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 12px; }
+    .badge.pending { background: #fff3e0; } .badge.confirmed { background: #e8f5e9; }
+    .badge.cancelled { background: #ffebee; } .badge.completed { background: #e3f2fd; }
+    .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
+    .toolbar select { width: auto; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="login-card" class="card">
+      <h1>Вход</h1>
+      <form id="login-form">
+        <div class="form-row">
+          <label>Логин</label>
+          <input type="text" id="login-username" required />
+        </div>
+        <div class="form-row">
+          <label>Пароль</label>
+          <input type="password" id="login-password" required />
+        </div>
+        <div id="login-error" class="error hidden"></div>
+        <button type="submit">Войти</button>
+      </form>
+    </div>
+
+    <div id="orders-panel" class="card hidden">
+      <h1>Заказы</h1>
+      <div class="toolbar">
+        <select id="filter-status">
+          <option value="">Все статусы</option>
+          <option value="pending">Ожидает</option>
+          <option value="confirmed">Подтверждён</option>
+          <option value="cancelled">Отменён</option>
+          <option value="completed">Выполнен</option>
+        </select>
+        <button type="button" id="btn-refresh">Обновить</button>
+      </div>
+      <div id="orders-error" class="error hidden"></div>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Пользователь</th>
+            <th>Товар</th>
+            <th>Вес</th>
+            <th>Статус</th>
+            <th>Дата</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="orders-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      const API = '';
+      let token = localStorage.getItem('admin_token');
+
+      function headers() {
+        const h = { 'Content-Type': 'application/json' };
+        if (token) h['Authorization'] = 'Bearer ' + token;
+        return h;
+      }
+
+      async function api(path, options = {}) {
+        const r = await fetch(API + path, { ...options, headers: { ...headers(), ...(options.headers || {}) } });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(data.error?.message || r.statusText);
+        if (data.ok === false) throw new Error(data.error?.message || 'Ошибка');
+        return data.result;
+      }
+
+      function show(el) { el.classList.remove('hidden'); }
+      function hide(el) { el.classList.add('hidden'); }
+
+      document.getElementById('login-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const errEl = document.getElementById('login-error');
+        errEl.textContent = '';
+        hide(errEl);
+        try {
+          const result = await api('/admin/auth/login', {
+            method: 'POST',
+            body: JSON.stringify({
+              username: document.getElementById('login-username').value,
+              password: document.getElementById('login-password').value
+            })
+          });
+          token = result.access_token;
+          localStorage.setItem('admin_token', token);
+          hide(document.getElementById('login-card'));
+          show(document.getElementById('orders-panel'));
+          loadOrders();
+        } catch (err) {
+          errEl.textContent = err.message;
+          show(errEl);
+        }
+      });
+
+      function renderOrders(orders) {
+        const tbody = document.getElementById('orders-tbody');
+        const statusLabels = { pending: 'Ожидает', confirmed: 'Подтверждён', cancelled: 'Отменён', completed: 'Выполнен' };
+        tbody.innerHTML = orders.map(o => {
+          const date = o.created_at ? new Date(o.created_at).toLocaleString('ru') : '';
+          const canChange = o.status === 'pending' || o.status === 'confirmed';
+          let actions = '';
+          if (canChange && o.status !== 'confirmed') actions += '<button type="button" class="small" data-action="confirm" data-id="' + o.id + '">Подтвердить</button>';
+          if (canChange && o.status !== 'cancelled') actions += '<button type="button" class="small secondary" data-action="cancel" data-id="' + o.id + '">Отменить</button>';
+          if (canChange && o.status !== 'completed') actions += '<button type="button" class="small" data-action="complete" data-id="' + o.id + '">Выполнен</button>';
+          return '<tr><td>' + o.id + '</td><td>' + o.user_id + '</td><td>' + o.product_id + '</td><td>' + o.weight_total + ' кг</td><td><span class="badge ' + o.status + '">' + (statusLabels[o.status] || o.status) + '</span></td><td>' + date + '</td><td>' + actions + '</td></tr>';
+        }).join('');
+        tbody.querySelectorAll('[data-action]').forEach(btn => {
+          btn.addEventListener('click', () => setStatus(parseInt(btn.dataset.id, 10), btn.dataset.action));
+        });
+      }
+
+      async function loadOrders() {
+        const errEl = document.getElementById('orders-error');
+        errEl.textContent = '';
+        hide(errEl);
+        const status = document.getElementById('filter-status').value;
+        try {
+          const path = '/admin/orders' + (status ? '?status=' + status : '');
+          const orders = await api(path);
+          renderOrders(orders);
+        } catch (err) {
+          if (err.message.includes('403') || err.message.includes('Invalid')) {
+            token = null;
+            localStorage.removeItem('admin_token');
+            hide(document.getElementById('orders-panel'));
+            show(document.getElementById('login-card'));
+          } else {
+            errEl.textContent = err.message;
+            show(errEl);
+          }
+        }
+      }
+
+      async function setStatus(orderId, action) {
+        const statusMap = { confirm: 'confirmed', cancel: 'cancelled', complete: 'completed' };
+        const status = statusMap[action];
+        if (!status) return;
+        try {
+          await api('/admin/orders/' + orderId + '/status', { method: 'PATCH', body: JSON.stringify({ status }) });
+          loadOrders();
+        } catch (err) {
+          alert(err.message);
+        }
+      }
+
+      document.getElementById('filter-status').addEventListener('change', loadOrders);
+      document.getElementById('btn-refresh').addEventListener('click', loadOrders);
+
+      if (token) {
+        hide(document.getElementById('login-card'));
+        show(document.getElementById('orders-panel'));
+        loadOrders();
+      }
+    })();
+  </script>
+</body>
+</html>

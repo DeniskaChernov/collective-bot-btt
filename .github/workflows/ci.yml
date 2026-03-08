@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Lint
+        run: ruff check app tests --output-format=github
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run tests
+        env:
+          TESTING: "1"
+          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+          SCHEDULER_JOBSTORE_URL: "sqlite:///:memory:"
+          TELEGRAM_BOT_TOKEN: "test:token"
+          JWT_SECRET: "test-jwt-secret"
+          ADMIN_USERNAME: "admin"
+          ADMIN_PASSWORD_HASH: "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.GY2YqYqYqYqYqY"
+        run: pytest tests -v

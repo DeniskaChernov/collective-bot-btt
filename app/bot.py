@@ -1,0 +1,41 @@
+from __future__ import annotations
+
+import logging
+
+from aiogram import Bot, Dispatcher
+from aiogram.enums import ParseMode
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from app.bot_handlers.catalog import router as catalog_router
+from app.bot_handlers.contacts import router as contacts_router
+from app.bot_handlers.middlewares import DbSessionMiddleware
+from app.bot_handlers.start import router as start_router
+from app.config import Settings
+
+logger = logging.getLogger(__name__)
+
+
+def create_bot(settings: Settings) -> Bot:
+    return Bot(token=settings.telegram_bot_token, parse_mode=ParseMode.HTML)
+
+
+def create_dispatcher(sessionmaker: async_sessionmaker[AsyncSession]) -> Dispatcher:
+    dp = Dispatcher()
+    dp.message.middleware(DbSessionMiddleware(sessionmaker))
+    dp.include_router(start_router)
+    dp.include_router(contacts_router)
+    dp.include_router(catalog_router)
+    return dp
+
+
+async def ensure_webhook(bot: Bot, settings: Settings) -> None:
+    if not settings.webhook_base_url:
+        return
+    url = settings.webhook_base_url.rstrip("/") + settings.telegram_webhook_path
+    await bot.set_webhook(
+        url=url,
+        secret_token=settings.telegram_secret_token,
+        drop_pending_updates=False,
+    )
+    logger.info("telegram.webhook_set", extra={"url": url})
+
