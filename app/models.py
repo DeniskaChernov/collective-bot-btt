@@ -27,6 +27,7 @@ class ProductStatus(str, enum.Enum):
     open = "open"
     waiting_24h = "waiting_24h"
     closed = "closed"
+    cancelled = "cancelled"
 
 
 class User(Base):

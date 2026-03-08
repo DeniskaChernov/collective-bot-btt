@@ -51,6 +51,7 @@ async def list_orders(
     offset: int = Query(default=0, ge=0),
     status: Order.OrderStatus | None = Query(default=None),
     fulfillment_type: Order.FulfillmentType | None = Query(default=None),
+    product_id: int | None = Query(default=None),
     session: AsyncSession = Depends(get_db),
 ):
     stmt = select(Order).options(selectinload(Order.user))
@@ -59,11 +60,39 @@ async def list_orders(
         conditions.append(Order.status == status)
     if fulfillment_type is not None:
         conditions.append(Order.fulfillment_type == fulfillment_type)
+    if product_id is not None:
+        conditions.append(Order.product_id == product_id)
     if conditions:
         stmt = stmt.where(and_(*conditions))
     stmt = stmt.order_by(desc(Order.created_at)).limit(limit).offset(offset)
     orders = list((await session.execute(stmt)).scalars().all())
     return ok([_order_to_admin_out(o) for o in orders])
+
+
+@router.post("/bulk-confirm-by-product")
+async def bulk_confirm_pending_by_product(
+    product_id: int = Query(..., description="ID партии (товара)"),
+    session: AsyncSession = Depends(get_db),
+):
+    """Подтвердить все заказы со статусом «Ожидает» по указанной партии."""
+    stmt = select(Order).where(
+        Order.product_id == product_id,
+        Order.status == Order.OrderStatus.pending,
+    ).options(selectinload(Order.user))
+    result = await session.execute(stmt)
+    orders = list(result.scalars().all())
+    updated = 0
+    async with session.begin():
+        for order in orders:
+            order.status = Order.OrderStatus.confirmed
+            updated += 1
+            if order.user and order.user.telegram_id:
+                await send_user_notification(
+                    int(order.user.telegram_id),
+                    f"✅ Заказ #{order.id} подтверждён.",
+                )
+        await session.flush()
+    return ok({"updated": updated, "order_ids": [o.id for o in orders]})
 
 
 @router.get("/{order_id}")

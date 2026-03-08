@@ -146,3 +146,20 @@ async def manual_reopen_product(session: AsyncSession, *, product_id: int) -> Pr
     await send_admin_notification(f"🔄 Партия #{product_id} переоткрыта администратором")
     return product
 
+
+async def manual_cancel_product(session: AsyncSession, *, product_id: int) -> Product:
+    """Отменить партию: статус cancelled, планировщик не трогает её."""
+    async with session.begin():
+        product = (
+            await session.execute(
+                select(Product).where(Product.id == product_id).with_for_update()
+            )
+        ).scalar_one_or_none()
+        if product is None:
+            raise NotFound("Product not found", details={"product_id": product_id})
+        product.status = ProductStatus.cancelled
+        logger.info("product.cancelled", extra={"product_id": product_id, "source": "admin"})
+        await session.flush()
+    await send_admin_notification(f"❌ Партия #{product_id} отменена администратором")
+    return product
+

@@ -15,6 +15,7 @@ from app.services.products import (
     create_product,
     get_product,
     list_products,
+    manual_cancel_product,
     manual_close_product,
     manual_reopen_product,
     update_product,
@@ -105,5 +106,19 @@ async def admin_manual_reopen(product_id: int, request: Request, session: AsyncS
     cancel_close_product(sched, product_id=product_id)
     if product.collection_until:
         schedule_collection_end_product(sched, product_id=product_id, run_at=product.collection_until)
+    return ok(ProductOut.model_validate(product))
+
+
+@router.post("/{product_id}/cancel")
+async def admin_manual_cancel(product_id: int, request: Request, session: AsyncSession = Depends(get_db)):
+    """Отменить партию (статус cancelled). Заказы не меняются."""
+    product = await manual_cancel_product(session, product_id=product_id)
+    sched = _scheduler(request)
+    cancel_close_product(sched, product_id=product_id)
+    cancel_collection_end_product(sched, product_id=product_id)
+    logger.info(
+        "scheduler.jobs_cancelled_for_product",
+        extra={"product_id": product_id},
+    )
     return ok(ProductOut.model_validate(product))
 

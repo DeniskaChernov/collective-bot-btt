@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
 from app.database import get_db
-from app.models import Order
+from app.models import Order, ProductStatus
 from app.schemas.cart import CartItemOut, CartOut
 from app.schemas.order import OrderCreateIn, OrderOut
 from app.schemas.product import ProductOut
@@ -88,6 +88,7 @@ async def me(user=Depends(current_user)):
 @router.get("/products")
 async def products(session: AsyncSession = Depends(get_db)):
     products_ = await list_products(session)
+    products_ = [p for p in products_ if p.status != ProductStatus.cancelled]
     return ok([ProductOut.model_validate(p) for p in products_])
 
 

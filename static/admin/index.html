@@ -25,6 +25,8 @@
     .badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 12px; }
     .badge.pending { background: #fff3e0; } .badge.confirmed { background: #e8f5e9; }
     .badge.cancelled { background: #ffebee; } .badge.completed { background: #e3f2fd; }
+    .badge.open { background: #e3f2fd; } .badge.waiting_24h { background: #fff8e1; }
+    .badge.closed { background: #e8e8e8; }
     .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
     .toolbar select { width: auto; }
     .upload-status { font-size: 13px; color: #666; }
@@ -58,7 +60,12 @@
       <div id="collective-order-card" class="card collective-card" style="margin-bottom: 20px;">
         <h2>Общий заказ (текущая партия)</h2>
         <div id="collective-order-body">Загрузка…</div>
-        <div style="margin-top: 10px;"><button type="button" id="btn-edit-collective" class="small">Редактировать партию</button></div>
+        <div style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+          <button type="button" id="btn-edit-collective" class="small">Редактировать партию</button>
+          <button type="button" id="btn-close-collective" class="small" style="display: none;">Закрыть в производство</button>
+          <button type="button" id="btn-cancel-collective" class="small secondary" style="display: none;">Отменить партию</button>
+          <button type="button" id="btn-confirm-all-pending" class="small" style="display: none;">Подтвердить все ожидающие</button>
+        </div>
       </div>
       <h2 style="font-size: 1rem; margin-bottom: 10px;">Заказы покупателей</h2>
       <div class="toolbar">
@@ -70,6 +77,7 @@
           <option value="completed">Выполнен</option>
         </select>
         <button type="button" id="btn-refresh">Обновить</button>
+        <button type="button" id="btn-export-csv" class="secondary">Экспорт CSV</button>
         <button type="button" id="btn-tab-products">Товары</button>
       </div>
       <div id="orders-error" class="error hidden"></div>
@@ -242,6 +250,7 @@
         try {
           const path = '/admin/orders' + (status ? '?status=' + status : '');
           const orders = await api(path);
+          lastOrders = orders;
           renderOrders(orders);
         } catch (err) {
           if (err.message.includes('403') || err.message.includes('Invalid')) {
@@ -273,6 +282,29 @@
         loadOrders();
         loadCollectiveOrder();
       });
+      document.getElementById('btn-export-csv').addEventListener('click', function() {
+        const statusLabels = { pending: 'Ожидает', confirmed: 'Подтверждён', cancelled: 'Отменён', completed: 'Выполнен' };
+        const fulfillmentLabels = { pickup: 'Самовывоз', delivery: 'Доставка', uzum_market: 'Uzum Market' };
+        const rows = [['ID', 'Заказчик', 'Телефон', 'Вес (кг)', 'Получение', 'Статус', 'Дата']];
+        lastOrders.forEach(function(o) {
+          rows.push([
+            o.id,
+            (o.user_first_name || '—').replace(/"/g, '""'),
+            (o.user_phone || '—').replace(/"/g, '""'),
+            o.weight_total,
+            (fulfillmentLabels[o.fulfillment_type] || o.fulfillment_type || '—').replace(/"/g, '""'),
+            (statusLabels[o.status] || o.status).replace(/"/g, '""'),
+            o.created_at ? new Date(o.created_at).toLocaleString('ru') : '—'
+          ]);
+        });
+        const csv = rows.map(function(r) { return r.map(function(c) { return '"' + String(c) + '"'; }).join(','); }).join('\n');
+        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'orders_' + new Date().toISOString().slice(0, 10) + '.csv';
+        a.click();
+        URL.revokeObjectURL(a.href);
+      });
 
       document.getElementById('btn-tab-products').addEventListener('click', function() {
         hide(document.getElementById('orders-panel'));
@@ -288,21 +320,33 @@
 
       let collectiveProduct = null;
       let allProducts = [];
+      let lastOrders = [];
 
       async function loadCollectiveOrder() {
         const el = document.getElementById('collective-order-body');
+        const btnEdit = document.getElementById('btn-edit-collective');
+        const btnClose = document.getElementById('btn-close-collective');
+        const btnCancel = document.getElementById('btn-cancel-collective');
+        const btnConfirmAll = document.getElementById('btn-confirm-all-pending');
         try {
           const products = await api('/admin/products');
           allProducts = products;
-          var p = products.find(function(x) { return x.status === 'open' || x.status === 'waiting_24h'; }) || products[0];
+          var p = products.find(function(x) { return x.status === 'open' || x.status === 'waiting_24h'; }) || products.find(function(x) { return x.status === 'closed'; }) || products.find(function(x) { return x.status !== 'cancelled'; }) || products[0];
           collectiveProduct = p || null;
           if (!p) {
             el.innerHTML = '<p style="color:#666;">Нет партии. Создайте товар во вкладке «Товары» — он станет общим заказом.</p>';
-            document.getElementById('btn-edit-collective').style.display = 'none';
+            btnEdit.style.display = 'none';
+            btnClose.style.display = 'none';
+            btnCancel.style.display = 'none';
+            btnConfirmAll.style.display = 'none';
             return;
           }
-          document.getElementById('btn-edit-collective').style.display = '';
-          var statusL = { open: 'Набираем заказы', waiting_24h: 'Ждём дозаказ', closed: 'Производство' };
+          btnEdit.style.display = '';
+          var isActive = p.status === 'open' || p.status === 'waiting_24h';
+          btnClose.style.display = isActive ? '' : 'none';
+          btnCancel.style.display = isActive ? '' : 'none';
+          btnConfirmAll.style.display = isActive ? '' : 'none';
+          var statusL = { open: 'Набираем заказы', waiting_24h: 'Ждём дозаказ', closed: 'Производство', cancelled: 'Отменена' };
           el.innerHTML = '<p><strong>' + escapeHtml(p.name) + '</strong> (арт. ' + escapeHtml(p.article || '') + ')</p>' +
             '<p class="kg">Собрано ' + p.total_weight + ' кг из ' + p.min_weight + ' кг</p>' +
             '<p>Статус: ' + (statusL[p.status] || p.status) + '</p>';
@@ -316,6 +360,36 @@
         hide(document.getElementById('orders-panel'));
         show(document.getElementById('products-panel'));
         loadProducts().then(function() { editProduct(collectiveProduct.id, allProducts); });
+      });
+      document.getElementById('btn-close-collective').addEventListener('click', async function() {
+        if (!collectiveProduct) return;
+        if (!confirm('Закрыть партию в производство? Дозаказ будет недоступен.')) return;
+        try {
+          await api('/admin/products/' + collectiveProduct.id + '/close', { method: 'POST' });
+          loadCollectiveOrder();
+          loadOrders();
+        } catch (err) { alert(err.message); }
+      });
+      document.getElementById('btn-cancel-collective').addEventListener('click', async function() {
+        if (!collectiveProduct) return;
+        if (!confirm('Отменить партию? Заказы останутся в списке, но партия будет помечена как отменённая. Продолжить?')) return;
+        try {
+          await api('/admin/products/' + collectiveProduct.id + '/cancel', { method: 'POST' });
+          loadCollectiveOrder();
+          loadOrders();
+        } catch (err) { alert(err.message); }
+      });
+      document.getElementById('btn-confirm-all-pending').addEventListener('click', async function() {
+        if (!collectiveProduct) return;
+        try {
+          const result = await api('/admin/orders/bulk-confirm-by-product?product_id=' + collectiveProduct.id, { method: 'POST' });
+          if (result.updated > 0) {
+            alert('Подтверждено заказов: ' + result.updated);
+            loadOrders();
+          } else {
+            alert('Нет заказов со статусом «Ожидает» по этой партии.');
+          }
+        } catch (err) { alert(err.message); }
       });
 
       let editingProductId = null;
@@ -387,18 +461,24 @@
           const products = await api('/admin/products');
           allProducts = products;
           const tbody = document.getElementById('products-tbody');
-          const statusL = { open: 'Набираем заказы', waiting_24h: 'Ждём дозаказ', closed: 'Производство' };
+          const statusL = { open: 'Набираем заказы', waiting_24h: 'Ждём дозаказ', closed: 'Производство', cancelled: 'Отменена' };
           tbody.innerHTML = products.map(function(p) {
             var actions = '<button type="button" class="small" data-edit-id="' + p.id + '">Изменить</button>';
-            if (p.status === 'open' || p.status === 'waiting_24h') actions += ' <button type="button" class="small secondary" data-close-id="' + p.id + '">В производство</button>';
-            if (p.status === 'closed') actions += ' <button type="button" class="small" data-reopen-id="' + p.id + '">Открыть</button>';
-            return '<tr><td>' + p.id + '</td><td>' + (p.article || '') + '</td><td>' + (p.name || '') + '</td><td>' + (p.thread_width || '—') + '</td><td>' + (p.color || '—') + '</td><td>' + p.total_weight + '/' + p.min_weight + '</td><td>' + (statusL[p.status] || p.status) + '</td><td>' + actions + '</td></tr>';
+            if (p.status === 'open' || p.status === 'waiting_24h') {
+              actions += ' <button type="button" class="small" data-close-id="' + p.id + '">В производство</button>';
+              actions += ' <button type="button" class="small secondary" data-cancel-id="' + p.id + '">Отменить</button>';
+            }
+            if (p.status === 'closed' || p.status === 'cancelled') actions += ' <button type="button" class="small" data-reopen-id="' + p.id + '">Открыть</button>';
+            return '<tr><td>' + p.id + '</td><td>' + (p.article || '') + '</td><td>' + (p.name || '') + '</td><td>' + (p.thread_width || '—') + '</td><td>' + (p.color || '—') + '</td><td>' + p.total_weight + '/' + p.min_weight + '</td><td><span class="badge ' + p.status + '">' + (statusL[p.status] || p.status) + '</span></td><td>' + actions + '</td></tr>';
           }).join('');
           tbody.querySelectorAll('[data-edit-id]').forEach(function(btn) {
             btn.addEventListener('click', function() { editProduct(parseInt(btn.dataset.editId, 10), products); });
           });
           tbody.querySelectorAll('[data-close-id]').forEach(function(btn) {
             btn.addEventListener('click', function() { closeProduct(parseInt(btn.dataset.closeId, 10)); });
+          });
+          tbody.querySelectorAll('[data-cancel-id]').forEach(function(btn) {
+            btn.addEventListener('click', function() { cancelProduct(parseInt(btn.dataset.cancelId, 10)); });
           });
           tbody.querySelectorAll('[data-reopen-id]').forEach(function(btn) {
             btn.addEventListener('click', function() { reopenProduct(parseInt(btn.dataset.reopenId, 10)); });
@@ -442,6 +522,13 @@
       async function closeProduct(id) {
         try {
           await api('/admin/products/' + id + '/close', { method: 'POST' });
+          loadProducts();
+        } catch (err) { alert(err.message); }
+      }
+      async function cancelProduct(id) {
+        if (!confirm('Отменить эту партию? Заказы по ней останутся в списке.')) return;
+        try {
+          await api('/admin/products/' + id + '/cancel', { method: 'POST' });
           loadProducts();
         } catch (err) { alert(err.message); }
       }

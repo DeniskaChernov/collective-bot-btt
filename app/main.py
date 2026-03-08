@@ -115,6 +115,21 @@ def create_app() -> FastAPI:
     async def health():
         return ok(True)
 
+    uploads_dir = Path(__file__).resolve().parent.parent / "uploads"
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+
+    async def serve_upload(file_path: str):
+        """Отдача файлов из uploads (единственный обработчик /uploads/*)."""
+        if ".." in file_path or file_path.startswith("/"):
+            return JSONResponse(status_code=404, content={"detail": "Not found"})
+        path = uploads_dir / file_path
+        if not path.is_file():
+            logger.warning("uploads.file_not_found", extra={"path": file_path, "resolved": str(path)})
+            return JSONResponse(status_code=404, content={"detail": "Not found"})
+        return FileResponse(path)
+
+    app.add_api_route("/uploads/{file_path:path}", serve_upload, methods=["GET"])
+
     app.include_router(public_router)
     app.include_router(admin_auth_router)
     app.include_router(admin_upload_router)
@@ -134,22 +149,6 @@ def create_app() -> FastAPI:
     admin_ui_dir = Path(__file__).resolve().parent.parent / "static" / "admin"
     if admin_ui_dir.is_dir():
         app.mount("/admin-ui", StaticFiles(directory=str(admin_ui_dir), html=True), name="admin-ui")
-
-    uploads_dir = Path(__file__).resolve().parent.parent / "uploads"
-    uploads_dir.mkdir(parents=True, exist_ok=True)
-
-    async def serve_upload(file_path: str):
-        """Явная отдача файлов из uploads (надёжнее в проде и в WebView)."""
-        if ".." in file_path or file_path.startswith("/"):
-            return JSONResponse(status_code=404, content=err("not_found", "Not found").model_dump())
-        path = uploads_dir / file_path
-        if not path.is_file():
-            return JSONResponse(status_code=404, content=err("not_found", "Not found").model_dump())
-        return FileResponse(path)
-
-    app.add_api_route("/uploads/{file_path:path}", serve_upload, methods=["GET"])
-
-    app.mount("/uploads", StaticFiles(directory=str(uploads_dir)), name="uploads")
 
     return app
 
