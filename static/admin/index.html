@@ -111,7 +111,9 @@
             <button type="button" id="btn-upload-photo" class="secondary">Загрузить фото</button>
             <span id="upload-status" class="upload-status"></span>
           </div>
-          <input type="text" id="p-image-url" placeholder="/uploads/... или https://..." style="margin-top: 6px;" />
+          <p class="form-hint" style="margin: 4px 0 0 0; font-size: 12px; color: #666;">После загрузки нажмите «Сохранить», чтобы фото привязалось к товару.</p>
+          <div id="p-image-preview" style="margin-top: 8px; min-height: 60px;"></div>
+          <input type="text" id="p-image-url" placeholder="/uploads/... или https://..." style="margin-top: 6px; width: 100%;" />
         </div>
         <div class="form-row">
           <label>Порог партии (кг)</label>
@@ -265,6 +267,7 @@
         document.getElementById('p-image-url').value = '';
         document.getElementById('p-min-weight').value = '100';
         document.getElementById('p-max-weight').value = '25';
+        updateImagePreview('');
         hide(document.getElementById('product-form-error'));
         show(document.getElementById('product-form'));
       });
@@ -298,12 +301,20 @@
           var url = data.result && data.result.url ? data.result.url : data.url;
           if (!url) throw new Error('Нет URL в ответе');
           document.getElementById('p-image-url').value = url;
-          statusEl.textContent = 'Готово: ' + url;
+          updateImagePreview(url);
+          statusEl.textContent = 'Готово. Нажмите «Сохранить» ниже.';
           statusEl.className = 'upload-status ok';
         } catch (err) {
           statusEl.textContent = err.message;
           statusEl.className = 'upload-status err';
         }
+      });
+
+      document.getElementById('p-image-url').addEventListener('input', function() {
+        updateImagePreview(this.value.trim());
+      });
+      document.getElementById('p-image-url').addEventListener('change', function() {
+        updateImagePreview(this.value.trim());
       });
 
       async function loadProducts() {
@@ -352,9 +363,17 @@
         document.getElementById('p-thread-width').value = p.thread_width || '';
         document.getElementById('p-color').value = p.color || '';
         document.getElementById('p-image-url').value = p.image_url || '';
+        updateImagePreview(p.image_url || '');
         document.getElementById('p-min-weight').value = p.min_weight || 100;
         document.getElementById('p-max-weight').value = p.max_weight_per_order || 25;
         show(document.getElementById('product-form'));
+      }
+
+      function updateImagePreview(url) {
+        var el = document.getElementById('p-image-preview');
+        if (!url || !url.trim()) { el.innerHTML = ''; return; }
+        var src = url.trim().indexOf('/') === 0 ? url.trim() : url.trim();
+        el.innerHTML = '<img src="' + src.replace(/"/g, '&quot;') + '" alt="Превью" style="max-width: 120px; max-height: 120px; object-fit: contain; border-radius: 8px; border: 1px solid #ddd;" onerror="this.parentElement.innerHTML=\'<span style=color:#999>Не удалось загрузить превью</span>\';" />';
       }
 
       async function closeProduct(id) {
