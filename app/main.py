@@ -18,6 +18,7 @@ from app.logging import configure_logging
 from app.routers.admin.auth import router as admin_auth_router
 from app.routers.admin.orders import router as admin_orders_router
 from app.routers.admin.products import router as admin_products_router
+from app.routers.admin.upload import router as admin_upload_router
 from app.routers.admin.users import router as admin_users_router
 from app.routers.public import router as public_router
 from app.routers.telegram import build_telegram_router
@@ -116,6 +117,7 @@ def create_app() -> FastAPI:
 
     app.include_router(public_router)
     app.include_router(admin_auth_router)
+    app.include_router(admin_upload_router)
     app.include_router(admin_products_router)
     app.include_router(admin_orders_router)
     app.include_router(admin_users_router)
@@ -132,6 +134,10 @@ def create_app() -> FastAPI:
     admin_ui_dir = Path(__file__).resolve().parent.parent / "static" / "admin"
     if admin_ui_dir.is_dir():
         app.mount("/admin-ui", StaticFiles(directory=str(admin_ui_dir), html=True), name="admin-ui")
+
+    uploads_dir = Path(__file__).resolve().parent.parent / "uploads"
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+    app.mount("/uploads", StaticFiles(directory=str(uploads_dir)), name="uploads")
 
     return app
 

@@ -474,10 +474,15 @@
           const cartItem = cart.items.find(i => i.product_id === p.id);
           const weight = cartItem ? cartItem.weight : 0;
           const closed = p.status === 'closed';
-          const proxySrc = '/public/proxy-image?url=' + encodeURIComponent(p.image_url);
-          const directUrl = escapeAttr(p.image_url);
+          const isOwnUpload = p.image_url && p.image_url.indexOf('/') === 0;
+          const imgSrc = !p.image_url
+            ? ''
+            : isOwnUpload
+              ? p.image_url
+              : '/public/proxy-image?url=' + encodeURIComponent(p.image_url);
+          const directUrl = p.image_url ? escapeAttr(p.image_url) : '';
           const img = p.image_url
-            ? '<img src="' + proxySrc + '" data-fallback="' + directUrl + '" alt="" loading="lazy" onerror="if(this.dataset.fallback){this.onerror=null;this.src=this.dataset.fallback;}" />'
+            ? '<img src="' + imgSrc + '" data-fallback="' + directUrl + '" alt="" loading="lazy" onerror="if(this.dataset.fallback&&this.src.indexOf(\'/public/proxy\')>=0){this.onerror=null;this.src=this.dataset.fallback;}" />'
             : '<div class="no-img">🪑</div>';
           return '<div class="product-card" data-product-id="' + p.id + '">' + img +
             '<div class="product-info">' +
