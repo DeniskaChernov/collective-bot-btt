@@ -11,7 +11,10 @@ def _normalize_image_url(v: str | None) -> str | None:
     if v is None or (isinstance(v, str) and not v.strip()):
         return None
     s = v.strip()
-    return s if s.startswith(("http://", "https://")) else None
+    # Разрешаем свои загрузки (/uploads/...) и внешние ссылки (http/https)
+    if s.startswith(("/", "http://", "https://")):
+        return s
+    return None
 
 
 class ProductOut(BaseModel):
