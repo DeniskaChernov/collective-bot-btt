@@ -101,6 +101,7 @@ async def proxy_image(url: str):
     if "yandex" in parsed.netloc.lower():
         headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; rv:109.0) Gecko/20100101 Firefox/115.0"
         headers["Referer"] = "https://disk.yandex.ru/"
+        headers["Accept"] = "image/webp,image/apng,image/*,*/*;q=0.8"
     try:
         async with httpx.AsyncClient(follow_redirects=True, timeout=15.0) as client:
             r = await client.get(url, headers=headers)
