@@ -475,7 +475,7 @@
           const weight = cartItem ? cartItem.weight : 0;
           const closed = p.status === 'closed';
           const img = p.image_url
-            ? '<img src="' + escapeAttr(p.image_url) + '" alt="" loading="lazy" />'
+            ? '<img src="/public/proxy-image?url=' + encodeURIComponent(p.image_url) + '" alt="" loading="lazy" />'
             : '<div class="no-img">🪑</div>';
           return '<div class="product-card" data-product-id="' + p.id + '">' + img +
             '<div class="product-info">' +

@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import json
 from typing import Annotated
+from urllib.parse import urlparse
 
+import httpx
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import APIRouter, Depends, Header, Request
+from fastapi.responses import Response
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -86,6 +89,29 @@ async def me(user=Depends(current_user)):
 async def products(session: AsyncSession = Depends(get_db)):
     products_ = await list_products(session)
     return ok([ProductOut.model_validate(p) for p in products_])
+
+
+@router.get("/proxy-image")
+async def proxy_image(url: str):
+    """Прокси для картинок по ссылке (Яндекс.Диск и др.): сервер качает файл и отдаёт в приложение."""
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        return Response(status_code=400, content=b"Invalid URL")
+    try:
+        async with httpx.AsyncClient(follow_redirects=True, timeout=15.0) as client:
+            r = await client.get(url)
+            r.raise_for_status()
+            body = r.content
+            if len(body) > 10 * 1024 * 1024:
+                return Response(status_code=413, content=b"Image too large")
+            content_type = r.headers.get("content-type", "application/octet-stream").split(";")[0].strip()
+            if not content_type.startswith("image/"):
+                content_type = "image/jpeg"
+            return Response(content=body, media_type=content_type)
+    except httpx.HTTPError:
+        return Response(status_code=502, content=b"Upstream error")
+    except Exception:
+        return Response(status_code=502, content=b"Proxy error")
 
 
 @router.get("/cart")
