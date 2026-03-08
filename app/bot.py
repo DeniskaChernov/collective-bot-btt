@@ -30,6 +30,10 @@ def create_dispatcher(sessionmaker: async_sessionmaker[AsyncSession]) -> Dispatc
 
 async def ensure_webhook(bot: Bot, settings: Settings) -> None:
     if not settings.webhook_base_url:
+        logger.warning(
+            "telegram.webhook_skipped",
+            extra={"reason": "WEBHOOK_BASE_URL is not set — bot will not receive updates"},
+        )
         return
     url = settings.webhook_base_url.rstrip("/") + settings.telegram_webhook_path
     await bot.set_webhook(
