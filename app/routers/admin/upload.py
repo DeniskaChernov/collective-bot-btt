@@ -54,5 +54,9 @@ async def admin_upload_image(file: UploadFile = File(...)):
     except Exception as e:
         logger.exception("upload.write_failed", extra={"path": str(path)})
         return JSONResponse(status_code=500, content=err("internal_error", "Ошибка сохранения файла").model_dump())
+    if not path.is_file():
+        logger.error("upload.file_missing_after_write", extra={"path": str(path)})
+        return JSONResponse(status_code=500, content=err("internal_error", "Файл не сохранился").model_dump())
+    logger.info("upload.saved", extra={"path": str(path), "name": name})
     url = f"/uploads/{name}"
     return ok({"url": url})
