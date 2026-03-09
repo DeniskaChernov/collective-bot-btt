@@ -369,7 +369,7 @@
       flex-wrap: wrap;
     }
     .product-actions-wrap {
-      min-height: 40px;
+      min-height: 48px;
     }
     .product-actions button {
       width: 40px;
@@ -397,7 +397,13 @@
     .product-actions button:disabled { opacity: 0.4; cursor: not-allowed; }
     .product-actions button.danger { background: #b0b0b0; }
     .product-actions button.danger:hover:not(:disabled) { background: #909090; }
-    .product-actions .qty { font-weight: 700; min-width: 3ch; font-size: 15px; }
+    .product-actions .qty {
+      font-weight: 700;
+      min-width: 78px;
+      font-size: 15px;
+      text-align: center;
+      padding: 0 10px;
+    }
     .qty.bump {
       animation: qtyPulse 0.28s ease;
     }
@@ -492,7 +498,8 @@
     .section-filters {
       display: flex;
       gap: 8px;
-      overflow-x: auto;
+      flex-wrap: wrap;
+      overflow: visible;
       margin-bottom: 14px;
       padding-bottom: 4px;
     }
@@ -538,6 +545,7 @@
     }
     .sticky-cart-bar .meta {
       min-width: 0;
+      flex: 1;
     }
     .sticky-cart-bar .title {
       font-size: 12px;
@@ -559,8 +567,28 @@
       cursor: pointer;
       white-space: nowrap;
       backdrop-filter: blur(6px);
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
     }
     .sticky-cart-bar button:hover { background: rgba(255,255,255,0.24); }
+    .sticky-cart-bar .count-badge {
+      min-width: 24px;
+      height: 24px;
+      padding: 0 7px;
+      border-radius: 999px;
+      background: #35c759;
+      color: #fff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 800;
+      box-shadow: 0 4px 12px rgba(53,199,89,0.32);
+    }
+    .sticky-cart-bar .count-badge.bump {
+      animation: qtyPulse 0.28s ease;
+    }
 
     .form-group { margin-bottom: 18px; }
     .form-group label { display: block; margin-bottom: 6px; font-size: 14px; font-weight: 500; color: var(--text); }
@@ -984,6 +1012,9 @@
         bottom: 10px;
         padding: 12px;
       }
+      .sticky-cart-bar button {
+        padding: 11px 14px;
+      }
       .sticky-cart-bar .value {
         font-size: 13px;
       }
@@ -1069,7 +1100,7 @@
       <div class="title" id="sticky-cart-title"></div>
       <div class="value" id="sticky-cart-value"></div>
     </div>
-    <button type="button" id="sticky-cart-open"></button>
+    <button type="button" id="sticky-cart-open"><span id="sticky-cart-open-label"></span><span class="count-badge" id="sticky-cart-count">0</span></button>
   </div>
 
   <script>
@@ -1077,7 +1108,6 @@
       const API_BASE = '';
       const tg = window.Telegram && window.Telegram.WebApp;
       if (tg) { tg.ready(); tg.expand(); }
-      const initData = tg ? tg.initData || '' : '';
 
       const I18N = {
         ru: {
@@ -1104,8 +1134,11 @@
           addToCart: 'Добавить в корзину',
           inCart: 'В корзине',
           checkoutItem: 'Оформить заказ',
-          stickyCartTitle: 'Корзина',
-          stickyCartButton: 'Перейти',
+          stickyCartTitle: 'Добавлено в корзину',
+          stickyCartButton: 'Корзина',
+          stickyCartItemsOne: 'товар',
+          stickyCartItemsFew: 'товара',
+          stickyCartItemsMany: 'товаров',
           checkoutTitle: 'Подтверждение заказа',
           checkoutBack: '← Назад в корзину',
           checkoutSummaryTitle: 'Товар',
@@ -1195,8 +1228,11 @@
           addToCart: 'Savatga qo\'shish',
           inCart: 'Savatchada',
           checkoutItem: 'Buyurtmani rasmiylashtirish',
-          stickyCartTitle: 'Savat',
-          stickyCartButton: 'Ochish',
+          stickyCartTitle: 'Savatga qo\'shildi',
+          stickyCartButton: 'Savat',
+          stickyCartItemsOne: 'pozitsiya',
+          stickyCartItemsFew: 'pozitsiya',
+          stickyCartItemsMany: 'pozitsiya',
           checkoutTitle: 'Buyurtmani tasdiqlash',
           checkoutBack: '← Savatga qaytish',
           checkoutSummaryTitle: 'Mahsulot',
@@ -1278,8 +1314,39 @@
         return window.location.origin || (window.location.protocol + '//' + window.location.host);
       }
 
+      function getInitData() {
+        var runtimeInitData = tg && tg.initData ? tg.initData : '';
+        if (runtimeInitData) {
+          try { sessionStorage.setItem('telegram_init_data', runtimeInitData); } catch (_) {}
+          return runtimeInitData;
+        }
+        try {
+          var cachedInitData = sessionStorage.getItem('telegram_init_data');
+          if (cachedInitData) return cachedInitData;
+        } catch (_) {}
+        try {
+          var queryData = new URLSearchParams(window.location.search).get('tgWebAppData');
+          if (queryData) return queryData;
+          var hashData = new URLSearchParams((window.location.hash || '').replace(/^#/, '')).get('tgWebAppData');
+          if (hashData) return hashData;
+        } catch (_) {}
+        return '';
+      }
+
+      async function waitForInitData(timeoutMs) {
+        var startedAt = Date.now();
+        var limit = typeof timeoutMs === 'number' ? timeoutMs : 1500;
+        while (Date.now() - startedAt < limit) {
+          var data = getInitData();
+          if (data) return data;
+          await new Promise(function(resolve) { setTimeout(resolve, 60); });
+        }
+        return getInitData();
+      }
+
       function headers() {
         const h = { 'Content-Type': 'application/json' };
+        const initData = getInitData();
         if (initData) h['X-Telegram-Init-Data'] = initData;
         return h;
       }
@@ -1369,17 +1436,24 @@
         return '•';
       }
 
+      function cartItemsText(count) {
+        if (currentLang === 'uz') {
+          return count + ' ' + t('stickyCartItemsMany');
+        }
+        var mod10 = count % 10;
+        var mod100 = count % 100;
+        if (mod10 === 1 && mod100 !== 11) return count + ' ' + t('stickyCartItemsOne');
+        if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return count + ' ' + t('stickyCartItemsFew');
+        return count + ' ' + t('stickyCartItemsMany');
+      }
+
       function catalogActionHtml(product, weight) {
         var closed = product.status === 'closed' || product.status === 'cancelled';
-        if (weight > 0) {
-          return '<div class="product-actions">' +
-            '<button type="button" data-action="remove5" data-id="' + product.id + '"' + (weight < 5 || closed ? ' disabled' : '') + ' class="danger">−</button>' +
-            '<span class="qty">' + weight + ' кг</span>' +
-            '<button type="button" data-action="add5" data-id="' + product.id + '"' + (closed ? ' disabled' : '') + '>+</button>' +
-            '<button type="button" class="cta" data-open-cart="' + product.id + '"' + (closed ? ' disabled' : '') + '>' + escapeHtml(t('inCart')) + '</button>' +
-          '</div>';
-        }
-        return '<div class="product-actions"><button type="button" class="cta" data-action="add5" data-id="' + product.id + '"' + (closed ? ' disabled' : '') + '>' + escapeHtml(t('addToCart')) + '</button></div>';
+        return '<div class="product-actions">' +
+          '<button type="button" data-action="remove5" data-id="' + product.id + '"' + (weight < 5 || closed ? ' disabled' : '') + ' class="danger">−</button>' +
+          '<span class="qty">' + weight + ' кг</span>' +
+          '<button type="button" data-action="add5" data-id="' + product.id + '"' + (closed ? ' disabled' : '') + '>+</button>' +
+        '</div>';
       }
 
       function showToast(message) {
@@ -1442,9 +1516,11 @@
         var catalogQty = document.querySelector('[data-product-card="' + productId + '"] .qty');
         var cartQty = document.querySelector('[data-cart-row="' + productId + '"] .qty');
         var stickyValue = document.getElementById('sticky-cart-value');
+        var stickyCount = document.getElementById('sticky-cart-count');
         pulseNode(catalogQty);
         pulseNode(cartQty);
         pulseNode(stickyValue);
+        pulseNode(stickyCount);
       }
 
       function renderSuccessScene(order) {
@@ -1484,7 +1560,7 @@
         document.getElementById('cart-back').textContent = t('cartBack');
         document.getElementById('checkout-back').textContent = t('checkoutBack');
         document.getElementById('sticky-cart-title').textContent = t('stickyCartTitle');
-        document.getElementById('sticky-cart-open').textContent = t('stickyCartButton');
+        document.getElementById('sticky-cart-open-label').textContent = t('stickyCartButton');
         document.getElementById('fulfillment-type-label').textContent = t('fulfillmentLabel');
         document.querySelector('#fulfillment-type option[value="pickup"]').textContent = t('fulfillmentPickup');
         document.querySelector('#fulfillment-type option[value="delivery"]').textContent = t('fulfillmentDelivery');
@@ -1507,12 +1583,12 @@
       function renderStickyCart() {
         const bar = document.getElementById('sticky-cart-bar');
         const count = cartItemsCount();
-        const totalWeight = cartWeightTotal();
         if (count <= 0 || (currentView !== 'catalog' && currentView !== 'orders')) {
           bar.classList.remove('show');
           return;
         }
-        document.getElementById('sticky-cart-value').textContent = count + ' / ' + totalWeight + ' кг';
+        document.getElementById('sticky-cart-value').textContent = cartItemsText(count);
+        document.getElementById('sticky-cart-count').textContent = String(count);
         bar.classList.add('show');
       }
 
@@ -1976,6 +2052,7 @@
       });
 
       async function init() {
+        await waitForInitData(1800);
         await loadMe();
         await loadProducts();
         await loadCart();
