@@ -10,20 +10,22 @@ from fastapi import APIRouter, Depends, Header, Request
 from fastapi.responses import Response
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.config import Settings
 from app.database import get_db
 from app.models import Order, ProductStatus
+from app.i18n import normalize_lang
 from app.schemas.cart import CartItemOut, CartOut
 from app.schemas.order import OrderCreateIn, OrderOut
 from app.schemas.product import ProductOut
 from app.schemas.response import ok
-from app.schemas.user import MeOut
+from app.schemas.user import MeOut, UserLanguageUpdateIn
 from app.security.telegram_webapp import verify_init_data
 from app.services.cart import add_to_cart_5kg, get_cart, remove_from_cart_5kg
 from app.services.orders import create_order_from_cart
 from app.services.products import list_products
-from app.services.users import get_or_create_user_by_telegram_id, get_user
+from app.services.users import get_or_create_user_by_telegram_id, get_user, set_user_language
 
 router = APIRouter(prefix="/public", tags=["public"])
 
@@ -34,6 +36,26 @@ def _settings(request: Request) -> Settings:
 
 def _scheduler(request: Request) -> AsyncIOScheduler:
     return request.app.state.scheduler
+
+
+def _order_to_public_out(order: Order) -> OrderOut:
+    product = order.product
+    return OrderOut(
+        id=order.id,
+        user_id=order.user_id,
+        product_id=order.product_id,
+        weight_total=order.weight_total,
+        status=order.status,
+        fulfillment_type=order.fulfillment_type,
+        delivery_address=order.delivery_address,
+        comment=order.comment,
+        created_at=order.created_at,
+        product_name=product.name if product else None,
+        product_article=product.article if product else None,
+        product_image_url=product.image_url if product else None,
+        product_color=product.color if product else None,
+        product_thread_width=product.thread_width if product else None,
+    )
 
 
 async def current_user_id(
@@ -51,6 +73,7 @@ async def current_user_id(
     telegram_id = int(user_obj["id"])
     first_name = user_obj.get("first_name")
     username = user_obj.get("username")
+    language_code = normalize_lang(user_obj.get("language_code"))
     async with session.begin():
         user = await get_or_create_user_by_telegram_id(
             session,
@@ -59,6 +82,9 @@ async def current_user_id(
             first_name=first_name,
             last_name=user_obj.get("last_name"),
         )
+        if not user.language and language_code:
+            user.language = language_code
+            await session.flush()
     return int(user.id)
 
 
@@ -79,10 +105,31 @@ async def me(user=Depends(current_user)):
             id=user.id,
             first_name=user.first_name,
             username=user.username,
+            language=user.language,
             has_phone=bool(user.phone),
             phone_masked=phone_masked,
+        )
     )
-)
+
+
+@router.patch("/me/language")
+async def update_my_language(
+    payload: UserLanguageUpdateIn,
+    user_id: int = Depends(current_user_id),
+    session: AsyncSession = Depends(get_db),
+):
+    async with session.begin():
+        user = await set_user_language(session, user_id=user_id, language=payload.language)
+    return ok(
+        MeOut(
+            id=user.id,
+            first_name=user.first_name,
+            username=user.username,
+            language=user.language,
+            has_phone=bool(user.phone),
+            phone_masked=("*" * (len(user.phone) - 4) + user.phone[-4:]) if user.phone and len(user.phone) >= 4 else None,
+        )
+    )
 
 
 @router.get("/products")
@@ -159,7 +206,12 @@ async def order_create(
         delivery_address=payload.delivery_address,
         comment=payload.comment,
     )
-    return ok(OrderOut.model_validate(order))
+    order = (
+        await session.execute(
+            select(Order).where(Order.id == order.id).options(selectinload(Order.product))
+        )
+    ).scalar_one()
+    return ok(_order_to_public_out(order))
 
 
 @router.get("/orders")
@@ -170,9 +222,35 @@ async def my_orders(
     stmt = (
         select(Order)
         .where(Order.user_id == user_id)
+        .options(selectinload(Order.product))
         .order_by(desc(Order.created_at))
     )
     result = await session.execute(stmt)
     orders = result.scalars().all()
-    return ok([OrderOut.model_validate(o) for o in orders])
+    return ok([_order_to_public_out(o) for o in orders])
+
+
+@router.post("/orders/{order_id}/received")
+async def mark_order_received(
+    order_id: int,
+    user_id: int = Depends(current_user_id),
+    session: AsyncSession = Depends(get_db),
+):
+    from app.errors import NotFound, ValidationError
+
+    async with session.begin():
+        order = (
+            await session.execute(
+                select(Order)
+                .where(Order.id == order_id, Order.user_id == user_id)
+                .options(selectinload(Order.product))
+            )
+        ).scalar_one_or_none()
+        if order is None:
+            raise NotFound("Order not found", details={"order_id": order_id})
+        if order.status != Order.OrderStatus.completed:
+            raise ValidationError("Only completed orders can be marked as received")
+        order.status = Order.OrderStatus.received
+        await session.flush()
+    return ok(_order_to_public_out(order))
 

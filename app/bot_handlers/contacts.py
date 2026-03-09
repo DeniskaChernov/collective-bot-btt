@@ -5,6 +5,7 @@ from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot_handlers.keyboards import main_menu_kb
+from app.i18n import normalize_lang, t
 from app.notifications import send_admin_notification
 from app.services.users import get_or_create_user_by_telegram_id, set_user_phone
 
@@ -26,10 +27,10 @@ async def contact(message: Message, session: AsyncSession):
     )
     await set_user_phone(session, user_id=user.id, phone=contact.phone_number)
     await session.commit()
+    lang = normalize_lang(user.language)
     await message.answer(
-        "✅ Регистрация завершена\n\n"
-        "Теперь откройте приложение — там каталог, корзина и оформление заказов.",
-        reply_markup=main_menu_kb(),
+        t("registration_done", lang),
+        reply_markup=main_menu_kb(lang),
     )
     await send_admin_notification(f"👤 Новый клиент: @{tg_user.username or ''} ({contact.phone_number})")
 

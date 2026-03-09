@@ -3,6 +3,7 @@ from __future__ import annotations
 from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, WebAppInfo
 
 from app.config import get_settings
+from app.i18n import normalize_lang, t
 
 
 def _mini_app_url() -> str | None:
@@ -12,21 +13,32 @@ def _mini_app_url() -> str | None:
     return base.rstrip("/") + "/mini-app/"
 
 
-def phone_request_kb() -> ReplyKeyboardMarkup:
+def language_select_kb() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text="Поделиться телефоном", request_contact=True)]],
+        keyboard=[[KeyboardButton(text="🇷🇺 RU"), KeyboardButton(text="🇺🇿 UZ")]],
         resize_keyboard=True,
         one_time_keyboard=True,
     )
 
 
-def main_menu_kb() -> ReplyKeyboardMarkup:
-    """Меню после регистрации: одна кнопка — открыть Mini App для каталога и заказов."""
+def phone_request_kb(lang: str | None = None) -> ReplyKeyboardMarkup:
+    current_lang = normalize_lang(lang)
+    return ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text=t("share_phone", current_lang), request_contact=True)]],
+        resize_keyboard=True,
+        one_time_keyboard=True,
+    )
+
+
+def main_menu_kb(lang: str | None = None) -> ReplyKeyboardMarkup:
+    """Меню после регистрации: открыть Mini App и сменить язык."""
+    current_lang = normalize_lang(lang)
     url = _mini_app_url()
     if url:
-        keyboard = [[KeyboardButton(text="📱 Открыть приложение", web_app=WebAppInfo(url=url))]]
+        keyboard = [[KeyboardButton(text=t("open_app", current_lang), web_app=WebAppInfo(url=url))]]
     else:
-        keyboard = [[KeyboardButton(text="📱 Каталог и заказы в приложении")]]
+        keyboard = [[KeyboardButton(text=t("open_app", current_lang))]]
+    keyboard.append([KeyboardButton(text=t("change_language", current_lang))])
     return ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
 
 
@@ -48,7 +60,7 @@ def inline_open_app_kb() -> "InlineKeyboardMarkup":
         return InlineKeyboardMarkup(inline_keyboard=[])
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="📱 Открыть приложение", web_app=WebAppInfo(url=url))]
+            [InlineKeyboardButton(text=f"{t('open_app', 'ru')} / {t('open_app', 'uz')}", web_app=WebAppInfo(url=url))]
         ]
     )
 

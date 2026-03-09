@@ -14,6 +14,7 @@ class UserOut(BaseModel):
     first_name: str | None
     last_name: str | None
     phone: str | None
+    language: str | None
     created_at: datetime
 
 
@@ -28,6 +29,11 @@ class MeOut(BaseModel):
     id: int
     first_name: str | None
     username: str | None
+    language: str | None
     has_phone: bool
     phone_masked: str | None  # последние 4 цифры для отображения
+
+
+class UserLanguageUpdateIn(BaseModel):
+    language: str
 

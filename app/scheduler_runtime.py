@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings, get_settings
 from app.database import create_engine, create_sessionmaker
+from app.i18n import t
 from app.models import Order, Product, ProductStatus, User
 from app.services.scheduler import schedule_close_product, schedule_collection_end_product
 from app.notifications import send_admin_notification, send_user_notification
@@ -90,18 +91,17 @@ async def _close_product_if_due(*, session: AsyncSession, product_id: int) -> No
         logger.info("product.closed", extra={"product_id": product_id, "source": "scheduler"})
 
         # Уведомляем всех участников партии
-        stmt = select(User.telegram_id).join(Order, Order.user_id == User.id).where(
+        stmt = select(User.telegram_id, User.language).join(Order, Order.user_id == User.id).where(
             Order.product_id == product_id
         )
         rows = (await session.execute(stmt)).all()
         notified_ids: set[int] = set()
-        for (tg_id,) in rows:
+        for tg_id, language in rows:
             if tg_id and tg_id not in notified_ids:
                 notified_ids.add(tg_id)
                 await send_user_notification(
                     int(tg_id),
-                    "🚀 Партия закрыта.\n"
-                    "Производство запущено. Ожидайте уведомление о готовности.",
+                    t("batch_closed", language),
                 )
 
     await send_admin_notification(f"🚀 Партия #{product_id} закрыта (таймер 24ч истёк)")

@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.errors import NotFound, ValidationError
+from app.i18n import normalize_lang, t
 from app.models import Order, Product, ProductStatus, User
 from app.notifications import send_admin_notification, send_user_notification
 from app.services.cart import clear_cart_item, get_cart_item_for_update
@@ -93,26 +94,25 @@ async def create_order_from_cart(
 
     # Уведомление пользователя о заказе
     if user.telegram_id:
+        user_lang = normalize_lang(user.language)
         await send_user_notification(
             user.telegram_id,
-            f"✅ Заказ создан: товар #{product_id}, {order.weight_total} кг.\n"
-            "Мы уведомим вас о запуске и закрытии партии.",
+            t("order_created", user_lang, product_id=product_id, weight_total=order.weight_total),
         )
 
     # Если только что достигли порога 100 кг — уведомляем всех участников партии
     if threshold_reached_now:
-        stmt = select(User.telegram_id).join(Order, Order.user_id == User.id).where(
+        stmt = select(User.telegram_id, User.language).join(Order, Order.user_id == User.id).where(
             Order.product_id == product_id
         )
         rows = (await session.execute(stmt)).all()
         notified_ids: set[int] = set()
-        for (tg_id,) in rows:
+        for tg_id, language in rows:
             if tg_id and tg_id not in notified_ids:
                 notified_ids.add(tg_id)
                 await send_user_notification(
                     int(tg_id),
-                    "🎉 Партия достигла 100 кг!\nЗапущен добор 24 часа. "
-                    "Вы можете увеличить заказ до закрытия партии.",
+                    t("threshold_reached", language),
                 )
 
     if scheduler is not None and should_schedule_product_id is not None and schedule_at is not None:

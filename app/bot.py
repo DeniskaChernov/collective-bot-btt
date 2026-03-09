@@ -13,6 +13,7 @@ from app.bot_handlers.contacts import router as contacts_router
 from app.bot_handlers.middlewares import DbSessionMiddleware
 from app.bot_handlers.start import router as start_router
 from app.config import Settings
+from app.i18n import t
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +53,10 @@ async def ensure_webhook(bot: Bot, settings: Settings) -> None:
     mini_app_url = settings.webhook_base_url.rstrip("/") + "/mini-app/"
     try:
         await bot.set_chat_menu_button(
-            menu_button=MenuButtonWebApp(text="Открыть приложение", web_app=WebAppInfo(url=mini_app_url))
+            menu_button=MenuButtonWebApp(
+                text=f"{t('open_app', 'ru')} / {t('open_app', 'uz')}",
+                web_app=WebAppInfo(url=mini_app_url),
+            )
         )
         logger.info("telegram.menu_button_set", extra={"url": mini_app_url})
     except Exception as e:

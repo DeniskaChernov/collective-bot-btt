@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.errors import NotFound, ValidationError
+from app.i18n import normalize_lang
 from app.models import User
 
 
@@ -53,6 +54,21 @@ async def set_user_phone(session: AsyncSession, *, user_id: int, phone: str) -> 
     user = await get_user(session, user_id=user_id)
     user.phone = normalized[:32]
     await session.flush()
+    return user
+
+
+async def set_user_language(session: AsyncSession, *, user_id: int, language: str) -> User:
+    user = await get_user(session, user_id=user_id)
+    user.language = normalize_lang(language)
+    await session.flush()
+    return user
+
+
+async def sync_user_language_if_missing(session: AsyncSession, *, user_id: int, language: str | None) -> User:
+    user = await get_user(session, user_id=user_id)
+    if not user.language and language:
+        user.language = normalize_lang(language)
+        await session.flush()
     return user
 
 

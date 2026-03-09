@@ -39,6 +39,7 @@ class User(Base):
     first_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
     last_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
     phone: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
+    language: Mapped[str | None] = mapped_column(String(2), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
@@ -124,6 +125,7 @@ class Order(Base):
         confirmed = "confirmed"
         cancelled = "cancelled"
         completed = "completed"
+        received = "received"
 
     class FulfillmentType(str, enum.Enum):
         pickup = "pickup"

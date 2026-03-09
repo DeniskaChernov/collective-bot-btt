@@ -19,6 +19,11 @@ class OrderOut(BaseModel):
     delivery_address: str | None
     comment: str | None
     created_at: datetime
+    product_name: str | None = None
+    product_article: str | None = None
+    product_image_url: str | None = None
+    product_color: str | None = None
+    product_thread_width: str | None = None
 
 
 class AdminOrderOut(OrderOut):

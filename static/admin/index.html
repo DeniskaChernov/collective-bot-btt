@@ -24,7 +24,7 @@
     th { background: #f9f9f9; font-weight: 600; }
     .badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 12px; }
     .badge.pending { background: #fff3e0; } .badge.confirmed { background: #e8f5e9; }
-    .badge.cancelled { background: #ffebee; } .badge.completed { background: #e3f2fd; }
+    .badge.cancelled { background: #ffebee; } .badge.completed { background: #e3f2fd; } .badge.received { background: #f3e5f5; }
     .badge.open { background: #e3f2fd; } .badge.waiting_24h { background: #fff8e1; }
     .badge.closed { background: #e8e8e8; }
     .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
@@ -75,6 +75,7 @@
           <option value="confirmed">Подтверждён</option>
           <option value="cancelled">Отменён</option>
           <option value="completed">Выполнен</option>
+          <option value="received">Получен</option>
         </select>
         <button type="button" id="btn-refresh">Обновить</button>
         <button type="button" id="btn-export-csv" class="secondary">Экспорт CSV</button>
@@ -222,15 +223,16 @@
 
       function renderOrders(orders) {
         const tbody = document.getElementById('orders-tbody');
-        const statusLabels = { pending: 'Ожидает', confirmed: 'Подтверждён', cancelled: 'Отменён', completed: 'Выполнен' };
+        const statusLabels = { pending: 'Ожидает', confirmed: 'Подтверждён', cancelled: 'Отменён', completed: 'Выполнен', received: 'Получен' };
         const fulfillmentLabels = { pickup: 'Самовывоз', delivery: 'Доставка', uzum_market: 'Uzum Market' };
         tbody.innerHTML = orders.map(o => {
           const date = o.created_at ? new Date(o.created_at).toLocaleString('ru') : '';
-          const canChange = o.status === 'pending' || o.status === 'confirmed';
+          const canChange = o.status === 'pending' || o.status === 'confirmed' || o.status === 'completed';
           let actions = '';
           if (canChange && o.status !== 'confirmed') actions += '<button type="button" class="small" data-action="confirm" data-id="' + o.id + '">Подтвердить</button>';
           if (canChange && o.status !== 'cancelled') actions += '<button type="button" class="small secondary" data-action="cancel" data-id="' + o.id + '">Отменить</button>';
           if (canChange && o.status !== 'completed') actions += '<button type="button" class="small" data-action="complete" data-id="' + o.id + '">Выполнен</button>';
+          if (o.status === 'completed') actions += '<button type="button" class="small" data-action="received" data-id="' + o.id + '">Получен</button>';
           const name = o.user_first_name || '—';
           const phone = o.user_phone || '—';
           const tgLink = o.telegram_link ? '<a href="' + escapeAttr(o.telegram_link) + '" target="_blank" rel="noopener" style="font-size:12px;">Написать в Telegram</a>' : '—';
@@ -266,7 +268,7 @@
       }
 
       async function setStatus(orderId, action) {
-        const statusMap = { confirm: 'confirmed', cancel: 'cancelled', complete: 'completed' };
+        const statusMap = { confirm: 'confirmed', cancel: 'cancelled', complete: 'completed', received: 'received' };
         const status = statusMap[action];
         if (!status) return;
         try {
@@ -283,7 +285,7 @@
         loadCollectiveOrder();
       });
       document.getElementById('btn-export-csv').addEventListener('click', function() {
-        const statusLabels = { pending: 'Ожидает', confirmed: 'Подтверждён', cancelled: 'Отменён', completed: 'Выполнен' };
+        const statusLabels = { pending: 'Ожидает', confirmed: 'Подтверждён', cancelled: 'Отменён', completed: 'Выполнен', received: 'Получен' };
         const fulfillmentLabels = { pickup: 'Самовывоз', delivery: 'Доставка', uzum_market: 'Uzum Market' };
         const rows = [['ID', 'Заказчик', 'Телефон', 'Вес (кг)', 'Получение', 'Статус', 'Дата']];
         lastOrders.forEach(function(o) {

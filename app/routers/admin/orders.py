@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
+from app.i18n import normalize_lang, order_status_text, t
 from app.models import Order
 from app.notifications import send_user_notification
 from app.schemas.order import AdminOrderOut, OrderOut, OrderStatusUpdateIn
@@ -87,9 +88,10 @@ async def bulk_confirm_pending_by_product(
             order.status = Order.OrderStatus.confirmed
             updated += 1
             if order.user and order.user.telegram_id:
+                lang = normalize_lang(order.user.language)
                 await send_user_notification(
                     int(order.user.telegram_id),
-                    f"✅ Заказ #{order.id} подтверждён.",
+                    t("order_confirmed", lang, order_id=order.id),
                 )
         await session.flush()
     return ok({"updated": updated, "order_ids": [o.id for o in orders]})
@@ -123,15 +125,11 @@ async def update_order_status(
         telegram_id = user.telegram_id if user else None
 
     if telegram_id:
-        status_text = {
-            Order.OrderStatus.pending: "ожидает",
-            Order.OrderStatus.confirmed: "подтверждён",
-            Order.OrderStatus.cancelled: "отменён",
-            Order.OrderStatus.completed: "выполнен",
-        }.get(payload.status, payload.status.value)
+        lang = normalize_lang(user.language if user else None)
+        status_text = order_status_text(payload.status.value, lang)
         await send_user_notification(
             telegram_id,
-            f"📦 Заказ #{order_id}: статус изменён на «{status_text}».",
+            t("order_status_changed", lang, order_id=order_id, status_text=status_text),
         )
     order = await session.get(Order, order_id, options=[selectinload(Order.user)])
     return ok(_order_to_admin_out(order))
@@ -151,9 +149,10 @@ async def cancel_order(order_id: int, session: AsyncSession = Depends(get_db)):
         telegram_id = user.telegram_id if user else None
 
     if telegram_id:
+        lang = normalize_lang(user.language if user else None)
         await send_user_notification(
             telegram_id,
-            f"❌ Заказ #{order_id} отменён.",
+            t("order_cancelled", lang, order_id=order_id),
         )
     order = await session.get(Order, order_id, options=[selectinload(Order.user)])
     return ok(_order_to_admin_out(order))
