@@ -27,6 +27,18 @@ async def get_or_create_user_by_telegram_id(
         await session.execute(select(User).where(User.telegram_id == telegram_id))
     ).scalar_one_or_none()
     if user is not None:
+        changed = False
+        if username is not None and user.username != username:
+            user.username = username
+            changed = True
+        if first_name is not None and user.first_name != first_name:
+            user.first_name = first_name
+            changed = True
+        if last_name is not None and user.last_name != last_name:
+            user.last_name = last_name
+            changed = True
+        if changed:
+            await session.flush()
         return user
 
     user = User(

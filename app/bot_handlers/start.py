@@ -29,6 +29,8 @@ async def _get_current_user(message: Message, session: AsyncSession):
         first_name=tg_user.first_name,
         last_name=tg_user.last_name,
     )
+    if not user.language and tg_user and tg_user.language_code:
+        user.language = normalize_lang(tg_user.language_code)
     await session.commit()
     return user
 

@@ -1308,10 +1308,32 @@
       let activeOrderFilter = 'all';
       let currentView = 'catalog';
       let lastSuccessOrder = null;
+      let lastResumeSyncAt = 0;
 
       function getImgBase() {
         if (typeof window === 'undefined' || !window.location) return '';
         return window.location.origin || (window.location.protocol + '//' + window.location.host);
+      }
+
+      function getTelegramLanguage() {
+        var raw = tg && tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user.language_code : '';
+        raw = (raw || '').toLowerCase();
+        return raw === 'uz' ? 'uz' : raw === 'ru' ? 'ru' : '';
+      }
+
+      function getStoredLang() {
+        try {
+          var stored = localStorage.getItem('miniapp_lang');
+          return stored === 'uz' || stored === 'ru' ? stored : '';
+        } catch (_) {
+          return '';
+        }
+      }
+
+      function setStoredLang(lang) {
+        try {
+          if (lang === 'uz' || lang === 'ru') localStorage.setItem('miniapp_lang', lang);
+        } catch (_) {}
       }
 
       function getInitData() {
@@ -1343,6 +1365,8 @@
         }
         return getInitData();
       }
+
+      currentLang = getStoredLang() || getTelegramLanguage() || 'ru';
 
       function headers() {
         const h = { 'Content-Type': 'application/json' };
@@ -1607,11 +1631,43 @@
         try {
           me = await api('/public/me');
           currentLang = (me && me.language) || currentLang || 'ru';
+          setStoredLang(currentLang);
         } catch (_) {
           me = null;
+          currentLang = getStoredLang() || getTelegramLanguage() || currentLang || 'ru';
         }
         applyStaticTexts();
         renderProfileBanner();
+      }
+
+      async function refreshAppState(options) {
+        var opts = options || {};
+        await waitForInitData(opts.initTimeoutMs || 400);
+        await loadMe();
+        if (opts.includeProducts) {
+          await loadProducts();
+        } else {
+          renderCatalog();
+        }
+        if (opts.includeCart) {
+          await loadCart();
+        } else {
+          renderCart();
+          renderStickyCart();
+        }
+        if (opts.includeOrders || currentView === 'orders') {
+          await loadOrders();
+        } else {
+          renderOrders();
+        }
+      }
+
+      function refreshOnResume() {
+        var now = Date.now();
+        if (now - lastResumeSyncAt < 1200) return;
+        lastResumeSyncAt = now;
+        refreshAppState({ includeProducts: false, includeCart: false, includeOrders: currentView === 'orders', initTimeoutMs: 600 })
+          .catch(function() {});
       }
 
       function showCatalogLoading() {
@@ -1959,6 +2015,7 @@
             body: JSON.stringify({ language: lang })
           });
           currentLang = me.language || lang;
+          setStoredLang(currentLang);
           applyStaticTexts();
           renderProfileBanner();
           renderCatalog();
@@ -1999,6 +2056,14 @@
       document.getElementById('lang-ru').addEventListener('click', function() { changeLanguage('ru'); });
       document.getElementById('lang-uz').addEventListener('click', function() { changeLanguage('uz'); });
       document.getElementById('fulfillment-type').addEventListener('change', toggleDeliveryField);
+      document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState !== 'visible') return;
+        refreshOnResume();
+      });
+      window.addEventListener('focus', function() {
+        refreshOnResume();
+      });
+      window.addEventListener('pageshow', refreshOnResume);
       document.querySelectorAll('.tabs button').forEach(function(btn) {
         btn.addEventListener('click', function() {
           switchView(btn.dataset.tab);
