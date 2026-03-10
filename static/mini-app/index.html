@@ -641,6 +641,7 @@
       animation: spin 0.7s linear infinite;
     }
     .error-msg { color: #c62828; font-size: 14px; margin-top: 10px; }
+    .error-msg .checkout-error-hint { display: block; margin-top: 8px; font-size: 12px; color: var(--text-muted); font-weight: 500; }
     .success-msg { color: #2e7d32; font-size: 14px; margin-top: 10px; font-weight: 500; }
     .back-link {
       display: inline-flex;
@@ -899,6 +900,12 @@
       line-height: 1.5;
       margin-bottom: 18px;
     }
+    .success-scene .hint.success-steps {
+      margin-bottom: 18px;
+      font-size: 13px;
+      color: var(--accent);
+      font-weight: 600;
+    }
     .success-scene .actions {
       display: flex;
       gap: 10px;
@@ -1118,7 +1125,10 @@
           tabOrders: 'Мои заказы',
           profileNoPhone: 'Укажите номер телефона в боте (@Bententrade), чтобы оформлять заказы.',
           catalogLoadErrorTitle: 'Не удалось загрузить каталог',
-          catalogLoadErrorHint: 'Откройте приложение из Telegram',
+          catalogLoadErrorHint: 'Откройте приложение из Telegram или нажмите «Повторить».',
+          retryButton: 'Повторить',
+          checkoutErrorHint: 'Если ошибка повторяется — напишите менеджеру в боте @Bententrade.',
+          checkoutBatchClosed: 'Партия уже закрыта или отменена. Вернитесь в корзину и обновите каталог.',
           noProductsTitle: 'Пока нет товаров',
           noProductsHint: 'Скоро здесь появятся партии ротанга',
           emptyGoCatalog: 'Перейти в каталог',
@@ -1146,11 +1156,16 @@
           checkoutSummaryStatus: 'Статус партии',
           checkoutSubmit: 'Подтвердить заказ',
           checkoutSuccess: 'Заказ оформлен. Мы свяжемся с вами.',
-          checkoutAccentNote: 'Проверьте способ получения и комментарий перед подтверждением заказа.',
+          checkoutAccentNotePickup: 'Адрес Ташкент Индекс, блокF01. С вами свяжется наш менеджер для подтверждения вашего заказа, а также отправит локацию магазина для большего удобства!',
+          checkoutAccentNoteDelivery: 'С вами свяжется наш менеджер для подтверждения вашего заказа, а также попросит у вас геолокацию для более удобной доставки!',
+          checkoutAccentNoteUzum: 'С вами свяжется наш менеджер для подтверждения вашего заказа, после того как ваш заказ выйдет с производства, будет создана карточка товара на Uzum Market, менеджер отправит вам ссылку на товар на маркетплейсе, после чего вам нужно будет заказать его на самом маркетплейсе.',
+          checkoutMinWeightError: 'Минимальный заказ для этой партии — {min} кг. Увеличьте количество в корзине.',
+          checkoutMaxWeightError: 'Максимальный заказ для этой партии — {max} кг. Уменьшите количество перед оформлением.',
           successTitle: 'Заказ оформлен',
           successHint: 'Мы уже сохранили заказ. Дальше вы сможете отслеживать его статус во вкладке «Мои заказы».',
           successToOrders: 'Перейти в мои заказы',
-          successToCatalog: 'Вернуться в каталог',
+          ordersLoadErrorHint: 'Нажмите «Повторить» или зайдите позже.',
+          successSteps: 'Дальше: менеджер свяжется → производство → получение.',
           fulfillmentLabel: 'Способ получения',
           fulfillmentPickup: 'Самовывоз',
           fulfillmentDelivery: 'Доставка',
@@ -1164,8 +1179,10 @@
           ordersTitle: 'Мои заказы',
           ordersLoading: 'Загрузка заказов...',
           ordersEmptyTitle: 'Пока нет заказов',
+          cartLoadErrorTitle: 'Не удалось загрузить корзину',
           ordersEmptyHint: 'Оформите заказ из корзины',
           ordersLoadErrorTitle: 'Не удалось загрузить заказы',
+          ordersLoadErrorHint: 'Нажмите «Повторить» или зайдите позже.',
           orderWeight: 'Вес',
           orderStatus: 'Статус',
           orderDate: 'Дата',
@@ -1212,7 +1229,10 @@
           tabOrders: 'Mening buyurtmalarim',
           profileNoPhone: 'Buyurtma berish uchun botda (@Bententrade) telefon raqamingizni yuboring.',
           catalogLoadErrorTitle: 'Katalogni yuklab bo\'lmadi',
-          catalogLoadErrorHint: 'Ilovani Telegram ichidan oching',
+          catalogLoadErrorHint: 'Ilovani Telegram ichidan oching yoki «Qayta urinish»ni bosing.',
+          retryButton: 'Qayta urinish',
+          checkoutErrorHint: 'Agar xato takrorlansa — botda menejerga yozing @Bententrade.',
+          checkoutBatchClosed: 'Partiya allaqachon yopilgan yoki bekor qilingan. Savatga qayting va katalogni yangilang.',
           noProductsTitle: 'Hozircha mahsulotlar yo\'q',
           noProductsHint: 'Yaqinda bu yerda yangi partiyalar paydo bo\'ladi',
           emptyGoCatalog: 'Katalogga o\'tish',
@@ -1240,11 +1260,17 @@
           checkoutSummaryStatus: 'Partiya holati',
           checkoutSubmit: 'Buyurtmani tasdiqlash',
           checkoutSuccess: 'Buyurtma rasmiylashtirildi. Siz bilan bog\'lanamiz.',
-          checkoutAccentNote: 'Buyurtmani tasdiqlashdan oldin olish usuli va izohni tekshiring.',
+          checkoutAccentNotePickup: 'Manzil: Toshkent, Index manzili, F01 blok. Buyurtmangizni tasdiqlash uchun menejerimiz siz bilan bog‘lanadi va do‘kon lokatsiyasini qulaylik uchun yuboradi.',
+          checkoutAccentNoteDelivery: 'Buyurtmangizni tasdiqlash uchun menejerimiz siz bilan bog‘lanadi va yetkazib berishni qulay tashkil qilish uchun geolokatsiyangizni so‘raydi.',
+          checkoutAccentNoteUzum: 'Buyurtmangiz ishlab chiqarishdan chiqqach, Uzum Market’da mahsulot kartasi yaratiladi. Menejer sizga shu kartaga havolani yuboradi, shundan so‘ng mahsulotni Uzum Market orqali buyurtma qilishingiz kerak bo‘ladi.',
+          checkoutMinWeightError: 'Ushbu partiya uchun minimal buyurtma — {min} kg. Miqdorni savatda oshiring.',
+          checkoutMaxWeightError: 'Ushbu partiya uchun maksimal buyurtma — {max} kg. Rasmiylashtirishdan oldin miqdorni kamaytiring.',
           successTitle: 'Buyurtma yaratildi',
           successHint: 'Buyurtma saqlandi. Endi uning holatini “Mening buyurtmalarim” bo‘limida kuzatishingiz mumkin.',
           successToOrders: 'Buyurtmalarimga o‘tish',
           successToCatalog: 'Katalogga qaytish',
+          ordersLoadErrorHint: '«Qayta urinish»ni bosing yoki keyinroq kiring.',
+          successSteps: 'Keyingi: menejer bog\'lanadi → ishlab chiqarish → olish.',
           fulfillmentLabel: 'Yetkazib berish turi',
           fulfillmentPickup: 'Olib ketish',
           fulfillmentDelivery: 'Yetkazib berish',
@@ -1260,6 +1286,8 @@
           ordersEmptyTitle: 'Hozircha buyurtmalar yo\'q',
           ordersEmptyHint: 'Savatdan buyurtma bering',
           ordersLoadErrorTitle: 'Buyurtmalarni yuklab bo\'lmadi',
+          ordersLoadErrorHint: '«Qayta urinish»ni bosing yoki keyinroq kiring.',
+          cartLoadErrorTitle: 'Savatni yuklab bo\'lmadi',
           orderWeight: 'Og\'irligi',
           orderStatus: 'Holat',
           orderDate: 'Sana',
@@ -1309,6 +1337,9 @@
       let currentView = 'catalog';
       let lastSuccessOrder = null;
       let lastResumeSyncAt = 0;
+      let ordersLoadError = false;
+      let cartLoadError = false;
+      let checkoutSubmitting = false;
 
       function getImgBase() {
         if (typeof window === 'undefined' || !window.location) return '';
@@ -1333,6 +1364,19 @@
       function setStoredLang(lang) {
         try {
           if (lang === 'uz' || lang === 'ru') localStorage.setItem('miniapp_lang', lang);
+        } catch (_) {}
+      }
+
+      function getStoredFulfillment() {
+        try {
+          var v = localStorage.getItem('miniapp_fulfillment');
+          return (v === 'pickup' || v === 'delivery' || v === 'uzum_market') ? v : 'pickup';
+        } catch (_) { return 'pickup'; }
+      }
+
+      function setStoredFulfillment(value) {
+        try {
+          if (value === 'pickup' || value === 'delivery' || value === 'uzum_market') localStorage.setItem('miniapp_fulfillment', value);
         } catch (_) {}
       }
 
@@ -1393,6 +1437,15 @@
 
       function locale() {
         return currentLang === 'uz' ? 'uz-UZ' : 'ru-RU';
+      }
+
+      function formatOrderDate(dateStr) {
+        var d = new Date(dateStr);
+        var day = ('0' + d.getDate()).slice(-2);
+        var month = ('0' + (d.getMonth() + 1)).slice(-2);
+        var hours = ('0' + d.getHours()).slice(-2);
+        var minutes = ('0' + d.getMinutes()).slice(-2);
+        return day + '.' + month + ', ' + hours + ':' + minutes;
       }
 
       function escapeHtml(value) {
@@ -1555,6 +1608,7 @@
           '<div class="icon">🎉</div>' +
           '<div class="title">' + escapeHtml(t('successTitle')) + '</div>' +
           '<div class="hint">' + escapeHtml(t('successHint')) + '</div>' +
+          '<div class="hint success-steps">' + escapeHtml(t('successSteps')) + '</div>' +
           '<div class="summary-card">' +
             '<div class="title">' + escapeHtml(order.product_name || '') + '</div>' +
             '<div class="summary-grid">' +
@@ -1694,16 +1748,21 @@
           products = await api('/public/products');
           renderCatalog();
         } catch (err) {
-          el.innerHTML = emptyStateHtml('📡', t('catalogLoadErrorTitle'), t('catalogLoadErrorHint'), '', '');
+          el.innerHTML = emptyStateHtml('📡', t('catalogLoadErrorTitle'), t('catalogLoadErrorHint'), t('retryButton'), 'data-retry="catalog"');
+          el.querySelectorAll('[data-retry="catalog"]').forEach(function(btn) {
+            btn.addEventListener('click', function() { loadProducts(); });
+          });
         }
       }
 
       async function loadCart() {
         showCartLoading();
+        cartLoadError = false;
         try {
           cart = await api('/public/cart');
         } catch (_) {
           cart = { items: [] };
+          cartLoadError = true;
         }
         renderCatalog();
         renderCart();
@@ -1712,10 +1771,12 @@
 
       async function loadOrders() {
         showOrdersLoading();
+        ordersLoadError = false;
         try {
           orders = await api('/public/orders');
         } catch (_) {
           orders = [];
+          ordersLoadError = true;
         }
         renderOrders();
       }
@@ -1798,6 +1859,14 @@
       function renderCart() {
         const el = document.getElementById('cart-list');
         const summaryEl = document.getElementById('cart-summary');
+        if (cartLoadError && !cart.items.length) {
+          summaryEl.innerHTML = '';
+          el.innerHTML = emptyStateHtml('📡', t('cartLoadErrorTitle'), t('catalogLoadErrorHint'), t('retryButton'), 'data-retry="cart"');
+          el.querySelectorAll('[data-retry="cart"]').forEach(function(btn) {
+            btn.addEventListener('click', function() { loadCart(); });
+          });
+          return;
+        }
         if (!cart.items.length) {
           summaryEl.innerHTML = '';
           el.innerHTML = emptyStateHtml('🧺', t('cartEmptyTitle'), t('cartEmptyHint'), t('emptyGoCatalog'), 'data-empty-go="catalog"');
@@ -1884,6 +1953,13 @@
         const visibleOrders = activeOrderFilter === 'all'
           ? orders
           : orders.filter(function(order) { return order.status === activeOrderFilter; });
+        if (ordersLoadError && !visibleOrders.length) {
+          el.innerHTML = emptyStateHtml('📡', t('ordersLoadErrorTitle'), t('ordersLoadErrorHint'), t('retryButton'), 'data-retry="orders"');
+          el.querySelectorAll('[data-retry="orders"]').forEach(function(btn) {
+            btn.addEventListener('click', function() { loadOrders(); });
+          });
+          return;
+        }
         if (!visibleOrders.length) {
           el.innerHTML = emptyStateHtml('📦', t('ordersEmptyTitle'), t('ordersEmptyHint'), t('emptyGoCatalog'), 'data-empty-go="catalog"');
           el.querySelectorAll('[data-empty-go]').forEach(function(btn) {
@@ -1909,7 +1985,7 @@
               '<div class="order-card-body">' +
                 '<div class="row"><span><strong>' + escapeHtml(name) + '</strong></span><span>' + order.weight_total + ' кг</span></div>' +
                 '<div class="meta">' + escapeHtml(order.product_article || '') + (order.product_thread_width ? ' · ' + escapeHtml(order.product_thread_width) : '') + (order.product_color ? ' · ' + escapeHtml(order.product_color) : '') + '</div>' +
-                '<div class="row"><span class="status ' + escapeAttr(order.status) + '">' + escapeHtml(statusIcon(order.status) + ' ' + orderStatusLabel(order.status)) + '</span><span>' + escapeHtml(new Date(order.created_at).toLocaleString(locale())) + '</span></div>' +
+                '<div class="row"><span class="status ' + escapeAttr(order.status) + '">' + escapeHtml(statusIcon(order.status) + ' ' + orderStatusLabel(order.status)) + '</span><span>' + escapeHtml(formatOrderDate(order.created_at)) + '</span></div>' +
               '</div>' +
             '</div>' +
             '<div class="details">' +
@@ -1936,12 +2012,24 @@
           showToast(t('cartEmptyHint'));
           return;
         }
+        var minWeight = product.min_weight || 0;
+        if (item.weight < minWeight) {
+          var msg = t('checkoutMinWeightError').replace('{min}', String(minWeight));
+          showToast(msg);
+          return;
+        }
+        var maxWeight = product.max_weight_per_order || 25;
+        if (item.weight > maxWeight) {
+          var msgMax = t('checkoutMaxWeightError').replace('{max}', String(maxWeight));
+          showToast(msgMax);
+          return;
+        }
         document.getElementById('checkout-product-id').value = String(productId);
         document.getElementById('checkout-error').textContent = '';
         document.getElementById('checkout-success').textContent = '';
         document.getElementById('delivery-address').value = '';
         document.getElementById('comment').value = '';
-        document.getElementById('fulfillment-type').value = 'pickup';
+        document.getElementById('fulfillment-type').value = getStoredFulfillment();
         document.getElementById('checkout-summary').innerHTML =
           '<div class="title">' + escapeHtml(product.name) + '</div>' +
           '<div class="meta">' + escapeHtml(product.article || '') + (product.color ? ' · ' + escapeHtml(product.color) : '') + '</div>' +
@@ -1949,9 +2037,22 @@
             '<div class="summary-item"><div class="label">' + escapeHtml(t('checkoutSummaryWeight')) + '</div><div class="value">' + item.weight + ' кг</div></div>' +
             '<div class="summary-item"><div class="label">' + escapeHtml(t('checkoutSummaryStatus')) + '</div><div class="value">' + escapeHtml(statusLabel(product.status)) + '</div></div>' +
           '</div>' +
-          '<div class="accent-note">' + escapeHtml(fulfillmentIcon(document.getElementById('fulfillment-type').value) + ' ' + t('checkoutAccentNote')) + '</div>';
+          '<div class="accent-note" id="checkout-accent-note"></div>';
         toggleDeliveryField();
         switchView('checkout');
+      }
+      
+      function updateFulfillmentNote() {
+        var sel = document.getElementById('fulfillment-type').value;
+        var note = document.getElementById('checkout-accent-note');
+        if (!note) return;
+        var textKey;
+        if (sel === 'pickup') textKey = 'checkoutAccentNotePickup';
+        else if (sel === 'delivery') textKey = 'checkoutAccentNoteDelivery';
+        else if (sel === 'uzum_market') textKey = 'checkoutAccentNoteUzum';
+        else textKey = null;
+        var text = textKey ? t(textKey) : '';
+        note.textContent = fulfillmentIcon(sel) + ' ' + text;
       }
 
       function toggleDeliveryField() {
@@ -1960,14 +2061,27 @@
         const input = document.getElementById('delivery-address');
         group.style.display = sel === 'delivery' ? 'block' : 'none';
         input.required = sel === 'delivery';
-        var note = document.querySelector('#checkout-summary .accent-note');
-        if (note) {
-          note.textContent = fulfillmentIcon(sel) + ' ' + t('checkoutAccentNote');
+        if (sel === 'delivery') {
+          input.placeholder = t('deliveryAddressPlaceholder');
+        } else {
+          input.placeholder = '';
         }
+        updateFulfillmentNote();
       }
 
       async function add5(productId, keepView) {
         try {
+          var product = productById(productId);
+          if (product) {
+            var currentItem = cart.items.find(function(entry) { return entry.product_id === productId; });
+            var currentWeight = currentItem ? currentItem.weight : 0;
+            var maxWeight = product.max_weight_per_order || 25;
+            if (currentWeight + 5 > maxWeight) {
+              var msgMax = t('checkoutMaxWeightError').replace('{max}', String(maxWeight));
+              showToast(msgMax);
+              return;
+            }
+          }
           var item = await api('/public/cart/' + productId + '/add5', { method: 'POST' });
           setCartItemWeight(productId, item.weight);
           syncCatalogCard(productId);
@@ -2077,19 +2191,35 @@
 
       document.getElementById('checkout-form').addEventListener('submit', async function(event) {
         event.preventDefault();
+        if (checkoutSubmitting) return;
         if (!me || !me.has_phone) {
           showToast(t('phoneRequired'));
           return;
         }
         const productId = parseInt(document.getElementById('checkout-product-id').value, 10);
+        const product = productById(productId);
+        if (product && (product.status === 'closed' || product.status === 'cancelled')) {
+          showToast(t('checkoutBatchClosed'));
+          return;
+        }
         const fulfillmentType = document.getElementById('fulfillment-type').value;
-        const deliveryAddress = document.getElementById('delivery-address').value.trim() || null;
+        const deliveryAddressInput = document.getElementById('delivery-address');
+        const rawDeliveryAddress = deliveryAddressInput.value.trim();
+        const deliveryAddress = rawDeliveryAddress || null;
         const comment = document.getElementById('comment').value.trim() || null;
         const errEl = document.getElementById('checkout-error');
         const okEl = document.getElementById('checkout-success');
         const btn = document.getElementById('checkout-submit');
+        deliveryAddressInput.classList.remove('error');
         errEl.textContent = '';
+        errEl.innerHTML = '';
         okEl.textContent = '';
+        if (fulfillmentType === 'delivery' && !rawDeliveryAddress) {
+          deliveryAddressInput.classList.add('error');
+          errEl.textContent = t('deliveryAddressLabel');
+          return;
+        }
+        checkoutSubmitting = true;
         btn.disabled = true;
         btn.classList.add('loading');
         try {
@@ -2101,6 +2231,7 @@
               comment: comment
             })
           });
+          setStoredFulfillment(fulfillmentType);
           okEl.textContent = t('checkoutSuccess');
           await loadCart();
           await loadOrders();
@@ -2109,8 +2240,9 @@
           renderSuccessScene(createdOrder);
           switchView('success');
         } catch (err) {
-          errEl.textContent = err.message;
+          errEl.innerHTML = escapeHtml(err.message) + '<br><span class="checkout-error-hint">' + escapeHtml(t('checkoutErrorHint')) + '</span>';
         } finally {
+          checkoutSubmitting = false;
           btn.disabled = false;
           btn.classList.remove('loading');
         }
