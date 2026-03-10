@@ -1126,6 +1126,7 @@
           profileNoPhone: 'Укажите номер телефона в боте (@Bententrade), чтобы оформлять заказы.',
           catalogLoadErrorTitle: 'Не удалось загрузить каталог',
           catalogLoadErrorHint: 'Откройте приложение из Telegram или нажмите «Повторить».',
+          initDataRequired: 'Откройте приложение из Telegram — так мы сможем вас распознать и оформить заказ.',
           retryButton: 'Повторить',
           checkoutErrorHint: 'Если ошибка повторяется — напишите менеджеру в боте @Bententrade.',
           checkoutBatchClosed: 'Партия уже закрыта или отменена. Вернитесь в корзину и обновите каталог.',
@@ -1230,6 +1231,7 @@
           profileNoPhone: 'Buyurtma berish uchun botda (@Bententrade) telefon raqamingizni yuboring.',
           catalogLoadErrorTitle: 'Katalogni yuklab bo\'lmadi',
           catalogLoadErrorHint: 'Ilovani Telegram ichidan oching yoki «Qayta urinish»ni bosing.',
+          initDataRequired: 'Ilovani Telegram ichidan oching — shunda sizni tanib, buyurtmani rasmiylashtiramiz.',
           retryButton: 'Qayta urinish',
           checkoutErrorHint: 'Agar xato takrorlansa — botda menejerga yozing @Bententrade.',
           checkoutBatchClosed: 'Partiya allaqachon yopilgan yoki bekor qilingan. Savatga qayting va katalogni yangilang.',
@@ -1425,8 +1427,12 @@
           headers: { ...headers(), ...((options && options.headers) || {}) }
         });
         const data = await res.json().catch(function() { return {}; });
-        if (!res.ok) throw new Error((data.error && data.error.message) || res.statusText || 'Error');
-        if (data.ok === false) throw new Error((data.error && data.error.message) || 'Error');
+        var msg = (data.error && data.error.message) || res.statusText || 'Error';
+        if (res.status === 401 || (data.error && data.error.code === 'init_data_required')) {
+          msg = t('initDataRequired');
+        }
+        if (!res.ok) throw new Error(msg);
+        if (data.ok === false) throw new Error(msg);
         return data.result;
       }
 
@@ -1534,8 +1540,11 @@
       }
 
       function showToast(message) {
-        if (tg && tg.showAlert) tg.showAlert(message);
-        else alert(message);
+        var text = (message && (message.indexOf('X-Telegram-Init-Data') !== -1 || message.indexOf('init_data_required') !== -1))
+          ? t('initDataRequired')
+          : (message || '');
+        if (tg && tg.showAlert) tg.showAlert(text);
+        else alert(text);
       }
 
       function emptyStateHtml(icon, title, hint, actionText, actionAttr) {

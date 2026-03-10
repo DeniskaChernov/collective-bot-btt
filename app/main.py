@@ -104,7 +104,16 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(ValueError)
     async def value_error_handler(request: Request, exc: ValueError):
-        return JSONResponse(status_code=400, content=err("bad_request", str(exc)).model_dump())
+        msg = str(exc)
+        if "X-Telegram-Init-Data" in msg or "initData" in msg or "init_data" in msg:
+            return JSONResponse(
+                status_code=401,
+                content=err(
+                    "init_data_required",
+                    "Откройте приложение из Telegram — так мы сможем вас распознать и оформить заказ.",
+                ).model_dump(),
+            )
+        return JSONResponse(status_code=400, content=err("bad_request", msg).model_dump())
 
     @app.exception_handler(Exception)
     async def unhandled_error_handler(request: Request, exc: Exception):

@@ -28,7 +28,7 @@ async def test_public_me_requires_init_data() -> None:
         base_url="http://test",
     ) as client:
         r = await client.get("/public/me")
-        assert r.status_code in (400, 422)
+        assert r.status_code in (400, 401, 422)
 
 
 @pytest.mark.asyncio
@@ -38,7 +38,7 @@ async def test_public_orders_requires_init_data() -> None:
         base_url="http://test",
     ) as client:
         r = await client.get("/public/orders")
-        assert r.status_code in (400, 422)
+        assert r.status_code in (400, 401, 422)
 
 
 @pytest.mark.asyncio
