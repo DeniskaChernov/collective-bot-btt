@@ -12,7 +12,6 @@ from app.errors import NotFound, ValidationError
 from app.i18n import normalize_lang, t
 from app.models import Order, Product, ProductStatus, User
 from app.notifications import (
-    send_admin_forum_topic,
     send_admin_dm,
     send_admin_notification,
     send_user_notification,
@@ -155,53 +154,8 @@ async def create_order_from_cart(
         await session.flush()
 
     logger.info("order.created", extra={"order_id": order.id, "user_id": user_id, "product_id": product_id})
-    await send_admin_notification(
-        f"🧾 Новый заказ #{order.id}: пользователь {user_id}, товар {product_id}, вес {order.weight_total} кг"
-    )
-
-    # Отправка в админ-группу в отдельную тему (если это форум)
-    try:
-        prod_name = product.name if product else f"Товар #{product_id}"
-        current_total = int(product.total_weight or 0) if product else 0
-        current_price = price_per_kg(current_total)
-        est_sum = int(order.weight_total) * int(current_price)
-        remaining_to_min = max(0, int(product.min_weight or 0) - current_total) if product else 0
-        remaining_to_next = next_tier_remaining(current_total)
-        tier_label = tier_label_ru(current_total)
-        title = f"Заказ #{order.id} • {prod_name}"
-        address = html.escape(order.delivery_address) if order.delivery_address else ""
-        comment_safe = html.escape(order.comment) if order.comment else ""
-        name_safe = html.escape(prod_name)
-        user_line = (" ".join([user.first_name or "", f"@{user.username}" if user.username else ""]).strip()) or f"User #{user_id}"
-        messages = [
-            "\n".join(
-                [
-                    f"🧾 <b>Поступил заказ #{order.id}</b>",
-                    f"Товар: <b>{name_safe}</b> (#{product_id})",
-                    f"Вес: <b>{order.weight_total} кг</b>",
-                    f"Получение: <b>{fulfillment_label_bilingual(order.fulfillment_type)}</b>",
-                    (f"Адрес: <b>{address}</b>" if address else ""),
-                    (f"Комментарий: {comment_safe}" if comment_safe else ""),
-                    "",
-                    f"👤 Клиент: {html.escape(user_line)}",
-                    (f"📞 Телефон: {user.phone}" if user.phone else ""),
-                ]
-            ).strip(),
-            "\n".join(
-                [
-                    "📊 <b>Сводка по партии</b>",
-                    f"Собрано: <b>{current_total} кг</b>",
-                    (f"До порога: <b>{remaining_to_min} кг</b>" if remaining_to_min else "Порог достигнут — идёт добор 24ч."),
-                    f"Текущий уровень: <b>{tier_label}</b>",
-                    (f"До следующего уровня: <b>{remaining_to_next} кг</b>" if remaining_to_next else "Достигнут максимальный уровень цены."),
-                    f"Цена сейчас: <b>{format_sum(current_price)} сум/кг</b>",
-                    f"Оценка суммы заказа: <b>{format_sum(est_sum)} сум</b>",
-                ]
-            ),
-        ]
-        await send_admin_forum_topic(title=title, messages=messages)
-    except Exception:
-        logger.exception("admin_forum_order_notification_failed", extra={"order_id": order.id})
+    # Старое админ-уведомление в группу оставляем только как fallback (можно выключить, не задавая ADMIN_TELEGRAM_CHAT_ID)
+    await send_admin_notification(f"🧾 Новый заказ #{order.id}: товар #{product_id}, {order.weight_total} кг")
 
     # Дублируем в личку админу (если настроен ADMIN_TELEGRAM_USER_ID)
     try:
@@ -209,6 +163,8 @@ async def create_order_from_cart(
         current_total = int(product.total_weight or 0) if product else 0
         current_price = price_per_kg(current_total)
         est_sum = int(order.weight_total) * int(current_price)
+        remaining_to_next = next_tier_remaining(current_total)
+        tier_label = tier_label_ru(current_total)
         dm_text = "\n".join(
             [
                 f"🧾 Заказ #{order.id}",
@@ -219,6 +175,8 @@ async def create_order_from_cart(
                 (f"Комментарий: {order.comment}" if order.comment else ""),
                 "",
                 f"Собрано по партии: {current_total} кг",
+                f"Уровень цены: {tier_label}",
+                (f"До следующего уровня: {remaining_to_next} кг" if remaining_to_next else "Достигнут максимальный уровень цены."),
                 f"Цена сейчас: {format_sum(current_price)} сум/кг",
                 f"Сумма (оценка): {format_sum(est_sum)} сум",
             ]
