@@ -62,7 +62,7 @@ async def get_user(session: AsyncSession, *, user_id: int) -> User:
 async def set_user_phone(session: AsyncSession, *, user_id: int, phone: str) -> User:
     normalized = normalize_phone(phone)
     if not normalized:
-        raise ValidationError("Некорректный номер телефона")
+        raise ValidationError("invalid_phone")
     user = await get_user(session, user_id=user_id)
     user.phone = normalized[:32]
     await session.flush()
@@ -87,6 +87,6 @@ async def sync_user_language_if_missing(session: AsyncSession, *, user_id: int, 
 async def require_user_phone(session: AsyncSession, *, user_id: int) -> str:
     user = await get_user(session, user_id=user_id)
     if not user.phone:
-        raise ValidationError("User phone is required")
+        raise ValidationError("user_phone_required")
     return user.phone
 

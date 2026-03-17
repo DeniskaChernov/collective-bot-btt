@@ -56,6 +56,11 @@ class Settings(BaseSettings):
         description="Telegram chat id to receive admin notifications",
     )
 
+    admin_telegram_user_id: int | None = Field(
+        default=None,
+        description="Telegram user id to receive admin DM notifications",
+    )
+
 
 def get_settings() -> Settings:
     return Settings()  # type: ignore[call-arg]

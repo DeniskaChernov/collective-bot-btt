@@ -13,7 +13,7 @@ from app.database import create_engine, create_sessionmaker
 from app.i18n import t
 from app.models import Order, Product, ProductStatus, User
 from app.services.scheduler import schedule_close_product, schedule_collection_end_product
-from app.notifications import send_admin_notification, send_user_notification
+from app.notifications import send_admin_notification, send_user_notification, send_user_notifications_batch
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +69,7 @@ async def close_product_job(*, product_id: int) -> None:
 
 async def _close_product_if_due(*, session: AsyncSession, product_id: int) -> None:
     now = datetime.now(timezone.utc)
+    notify_rows: list[tuple[int, str | None]] = []
     async with session.begin():
         product = (
             await session.execute(
@@ -90,21 +91,23 @@ async def _close_product_if_due(*, session: AsyncSession, product_id: int) -> No
         product.status = ProductStatus.closed
         logger.info("product.closed", extra={"product_id": product_id, "source": "scheduler"})
 
-        # Уведомляем всех участников партии
+        # Собираем участников партии (уведомим после коммита)
         stmt = select(User.telegram_id, User.language).join(Order, Order.user_id == User.id).where(
             Order.product_id == product_id
         )
-        rows = (await session.execute(stmt)).all()
-        notified_ids: set[int] = set()
-        for tg_id, language in rows:
-            if tg_id and tg_id not in notified_ids:
-                notified_ids.add(tg_id)
-                await send_user_notification(
-                    int(tg_id),
-                    t("batch_closed", language),
-                )
+        notify_rows = [(int(tg_id), language) for tg_id, language in (await session.execute(stmt)).all() if tg_id]
 
-    await send_admin_notification(f"🚀 Партия #{product_id} закрыта (таймер 24ч истёк)")
+    notified_ids: set[int] = set()
+    recipients: list[tuple[int, str]] = []
+    for tg_id, language in notify_rows:
+        if tg_id in notified_ids:
+            continue
+        notified_ids.add(tg_id)
+        recipients.append((int(tg_id), t("batch_closed", language)))
+    ok, fail = await send_user_notifications_batch(recipients, kind="batch_closed", per_message_delay_s=0.08)
+    await send_admin_notification(
+        f"🚀 Партия #{product_id} закрыта (таймер 24ч истёк). Уведомления: {ok} ok / {fail} fail"
+    )
 
 
 async def collection_end_job(*, product_id: int) -> None:

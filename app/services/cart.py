@@ -6,7 +6,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.errors import NotFound, ValidationError
-from app.models import CartItem, Product
+from app.models import CartItem, Product, ProductStatus
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +18,8 @@ async def add_to_cart_5kg(session: AsyncSession, *, user_id: int, product_id: in
         product = (await session.execute(select(Product).where(Product.id == product_id))).scalar_one_or_none()
         if product is None:
             raise NotFound("Product not found", details={"product_id": product_id})
+        if product.status in (ProductStatus.closed, ProductStatus.cancelled):
+            raise ValidationError("product_batch_closed")
 
         item = (
             await session.execute(
@@ -35,9 +37,7 @@ async def add_to_cart_5kg(session: AsyncSession, *, user_id: int, product_id: in
         if product.max_weight_per_order is not None and item.weight > product.max_weight_per_order:
             item.weight -= STEP_KG
             await session.flush()
-            raise ValidationError(
-                f"Максимум {product.max_weight_per_order} кг на один заказ по этому товару"
-            )
+            raise ValidationError("maximum_order_exceeded")
         await session.flush()
         logger.info("cart.add_5", extra={"user_id": user_id, "product_id": product_id, "weight": item.weight})
         return item
@@ -56,7 +56,7 @@ async def remove_from_cart_5kg(session: AsyncSession, *, user_id: int, product_i
             return None
 
         if item.weight < STEP_KG:
-            raise ValidationError("Cannot decrease below zero")
+            raise ValidationError("cannot_decrease_below_zero")
 
         item.weight -= STEP_KG
         if item.weight == 0:
@@ -85,7 +85,7 @@ async def get_cart_item_for_update(
         )
     ).scalar_one_or_none()
     if item is None:
-        raise ValidationError("Cart is empty for this product")
+        raise ValidationError("cart_empty_for_product")
     return item
 
 
