@@ -1541,8 +1541,11 @@
 
       if (token) {
         hide(document.getElementById('login-card'));
-        show(document.getElementById('orders-panel'));
+        show(document.getElementById('app-shell'));
+        navigate('dashboard');
         loadOrders();
+        loadCollectiveOrder();
+        loadProductsCount();
       }
     })();
   </script>
